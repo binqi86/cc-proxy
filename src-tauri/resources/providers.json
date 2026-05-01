@@ -1,0 +1,91 @@
+{
+  "dashscope": {
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
+    "chatPath": "/v1/chat/completions",
+    "defaultModel": "qwen-plus",
+    "id": "dashscope",
+    "modelMap": {
+      "gpt-4.1": "$DEFAULT_MODEL",
+      "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5-codex": "$DEFAULT_MODEL",
+      "o4-mini": "$DEFAULT_MODEL"
+    },
+    "modelsPath": "/v1/models",
+    "name": "阿里云百炼"
+  },
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com",
+    "chatPath": "/v1/chat/completions",
+    "defaultModel": "deepseek-chat",
+    "id": "deepseek",
+    "modelMap": {
+      "gpt-4.1": "$DEFAULT_MODEL",
+      "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5-codex": "$DEFAULT_MODEL",
+      "o4-mini": "$DEFAULT_MODEL"
+    },
+    "modelsPath": "/v1/models",
+    "name": "Deepseek"
+  },
+  "minimax": {
+    "baseUrl": "https://api.minimax.io",
+    "chatPath": "/v1/chat/completions",
+    "defaultModel": "MiniMax-M2.5",
+    "id": "minimax",
+    "modelMap": {
+      "gpt-4.1": "$DEFAULT_MODEL",
+      "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5-codex": "$DEFAULT_MODEL",
+      "o4-mini": "$DEFAULT_MODEL"
+    },
+    "modelsPath": "/v1/models",
+    "name": "Minimax"
+  },
+  "moonshot": {
+    "baseUrl": "https://api.moonshot.cn",
+    "chatPath": "/v1/chat/completions",
+    "defaultModel": "moonshot-v1-8k",
+    "id": "moonshot",
+    "modelMap": {
+      "gpt-4.1": "$DEFAULT_MODEL",
+      "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5-codex": "$DEFAULT_MODEL",
+      "o4-mini": "$DEFAULT_MODEL"
+    },
+    "modelsPath": "/v1/models",
+    "name": "Moonshot"
+  },
+  "volcengine-coding": {
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "chatPath": "/chat/completions",
+    "defaultModel": "ark-code-latest",
+    "id": "volcengine-coding",
+    "modelMap": {
+      "gpt-4.1": "$DEFAULT_MODEL",
+      "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5-codex": "$DEFAULT_MODEL",
+      "o4-mini": "$DEFAULT_MODEL"
+    },
+    "modelOptions": {
+      "minimax-m2.7": {
+        "systemMessageMode": "merge"
+      }
+    },
+    "modelsPath": "/models",
+    "name": "火山方舟 coding plan"
+  },
+  "zhipu": {
+    "baseUrl": "https://open.bigmodel.cn/api/paas",
+    "chatPath": "/v4/chat/completions",
+    "defaultModel": "glm-4-plus",
+    "id": "zhipu",
+    "modelMap": {
+      "gpt-4.1": "$DEFAULT_MODEL",
+      "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5-codex": "$DEFAULT_MODEL",
+      "o4-mini": "$DEFAULT_MODEL"
+    },
+    "modelsPath": "/v4/models",
+    "name": "智谱"
+  }
+}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#0099cc"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded rect -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bg)"/>
+  <!-- Outer ring -->
+  <circle cx="256" cy="240" r="160" fill="none" stroke="url(#accent)" stroke-width="6" opacity="0.3"/>
+  <!-- Left arrow (incoming) -->
+  <path d="M120 200 L180 240 L120 280" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right arrow (outgoing) -->
+  <path d="M392 200 L332 240 L392 280" fill="none" stroke="#00d4ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Center diamond/proxy -->
+  <rect x="216" y="200" width="80" height="80" rx="16" fill="none" stroke="url(#accent)" stroke-width="6" transform="rotate(45 256 240)"/>
+  <!-- Small dots at corners of diamond -->
+  <circle cx="256" cy="184" r="6" fill="#00d4ff"/>
+  <circle cx="256" cy="296" r="6" fill="#00d4ff"/>
+  <circle cx="200" cy="240" r="6" fill="#00d4ff"/>
+  <circle cx="312" cy="240" r="6" fill="#00d4ff"/>
+  <!-- App name text -->
+  <text x="256" y="425" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#e0e0e0" letter-spacing="2">CODEX</text>
+</svg>
