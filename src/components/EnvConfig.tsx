@@ -3,14 +3,14 @@ import useAppStore from '@/store/appStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Save, AlertTriangle } from '@/components/icons';
 import type { EnvConfig } from '@/lib/config';
 
 export default function EnvConfigPage() {
-  const { env, setEnv, saveEnv, startService } = useAppStore();
+  const { env, providers, setEnv, saveEnv, startService } = useAppStore();
   const [localEnv, setLocalEnv] = useState<EnvConfig>({ ...env });
   const [dirty, setDirty] = useState(false);
 
@@ -38,14 +38,33 @@ export default function EnvConfigPage() {
 
       {/* Upstream */}
       <Section title="Upstream">
-        <Field label="Provider Preset">
-          <Input value={localEnv.PROVIDER_PRESET || ''} onChange={e => handleChange('PROVIDER_PRESET', e.target.value)} placeholder="deepseek, moonshot, zhipu..." />
+        <div className="bg-muted/40 border border-border/50 rounded-md p-3 mb-2">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Provider Preset and API Key are managed from the <span className="font-medium text-foreground">Providers</span> tab.
+            Use the radio toggle in the sidebar to switch active providers.
+          </p>
+        </div>
+        <Field label="Provider Preset" hint="Managed from Providers tab">
+          <div className="flex items-center gap-2">
+            <Input
+              value={localEnv.PROVIDER_PRESET || ''}
+              readOnly
+              className="bg-muted/50 text-muted-foreground cursor-default font-mono text-xs"
+            />
+            {localEnv.PROVIDER_PRESET && providers[localEnv.PROVIDER_PRESET] && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-primary/10 text-primary whitespace-nowrap flex-shrink-0">
+                {providers[localEnv.PROVIDER_PRESET].name}
+              </span>
+            )}
+          </div>
         </Field>
-        <Field label="Target API Key" required={!localEnv.TARGET_API_KEY}>
-          <Input type="password" value={localEnv.TARGET_API_KEY || ''} onChange={e => handleChange('TARGET_API_KEY', e.target.value)} placeholder="sk-xxx" />
-        </Field>
-        <Field label="Default Model">
-          <Input value={localEnv.DEFAULT_MODEL || ''} onChange={e => handleChange('DEFAULT_MODEL', e.target.value)} placeholder="deepseek-chat" />
+        <Field label="Target API Key" hint="Synced from active provider's API Key">
+          <Input
+            type="password"
+            value={localEnv.TARGET_API_KEY || ''}
+            readOnly
+            className="bg-muted/50 text-muted-foreground cursor-default font-mono text-xs"
+          />
         </Field>
         <Field label="Request Timeout (ms)">
           <Input type="number" value={localEnv.REQUEST_TIMEOUT_MS || '600000'} onChange={e => handleChange('REQUEST_TIMEOUT_MS', e.target.value)} />
@@ -61,12 +80,9 @@ export default function EnvConfigPage() {
           </div>
           <Switch checked={localEnv.LOG_UPSTREAM_REQUEST === '1'} onChange={e => handleChange('LOG_UPSTREAM_REQUEST', e.target.checked ? '1' : '')} />
         </div>
-        <Field label="Model Map (JSON)" hint='e.g. {"gpt-5": "deepseek-chat"}'>
-          <Textarea value={localEnv.MODEL_MAP || '{}'} onChange={e => handleChange('MODEL_MAP', e.target.value)} className="font-mono text-xs" rows={4} />
-        </Field>
       </Section>
 
-      <Button className="w-full" onClick={() => { handleSave(); setTimeout(() => startService(), 500); }} disabled={!dirty || !localEnv.TARGET_API_KEY}>
+      <Button className="w-full" onClick={() => { handleSave(); setTimeout(() => startService(), 500); }} disabled={!dirty}>
         <Save className="w-3.5 h-3.5" /> Save & Restart
       </Button>
     </div>

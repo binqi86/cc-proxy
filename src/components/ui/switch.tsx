@@ -22,7 +22,7 @@ const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
           <div
             className={cn(
               'peer h-5 w-9 rounded-full border-2 transition-colors',
-              checked ? 'bg-accent border-accent' : 'bg-muted border-input',
+              checked ? 'bg-primary border-primary' : 'bg-muted border-input',
             )}
           />
           <div

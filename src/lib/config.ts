@@ -1,6 +1,7 @@
 export interface ProviderConfig {
   id: string;
   name: string;
+  apiKey?: string;
   baseUrl: string;
   chatPath: string;
   modelsPath: string;

@@ -39,10 +39,19 @@ npm install
 # Config reminder
 echo ""
 echo "Config files:"
-echo "  providers.json -> bundled in src-tauri/resources/"
-echo "  server.cjs      -> bundled in src-tauri/resources/"
-echo "  .env           -> create in project root (dev) or ~/.codex-cn-proxy/ (production)"
+echo "  providers.example.json -> copy to providers.json for local dev"
+echo "  providers.json         -> user config (gitignored, contains API keys)"
+echo "  .env                   -> create in project root (dev) or ~/.codex-cn-proxy/ (production)"
 echo ""
+
+# Auto-copy providers.example.json if providers.json doesn't exist
+if [ ! -f "providers.json" ]; then
+    if [ -f "providers.example.json" ]; then
+        cp providers.example.json providers.json
+        echo "Copied providers.example.json -> providers.json (edit API keys before use)"
+        echo ""
+    fi
+fi
 echo "Setup complete."
 echo ""
 echo "Next steps:"

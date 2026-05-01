@@ -33,6 +33,7 @@ interface AppState {
   saveEnv: () => Promise<void>;
   startService: () => Promise<void>;
   stopService: () => Promise<void>;
+  switchActiveProvider: (providerId: string) => Promise<void>;
 }
 
 const useAppStore = create<AppState>((set, get) => ({
@@ -132,6 +133,54 @@ const useAppStore = create<AppState>((set, get) => ({
         level: 'info',
         message: '服务已停止',
       });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  switchActiveProvider: async (providerId: string) => {
+    try {
+      set({ loading: true, error: null });
+      const { providers, env, service } = get();
+      const provider = providers[providerId];
+      if (!provider) {
+        set({ error: `Provider "${providerId}" not found`, loading: false });
+        return;
+      }
+
+      const newEnv: Record<string, string> = {
+        ...(env as Record<string, string>),
+        PROVIDER_PRESET: providerId,
+        TARGET_API_KEY: provider.apiKey || (env as Record<string, string>).TARGET_API_KEY || '',
+      };
+      // 清除 env 级别的覆盖项，统一使用 provider 配置
+      delete newEnv.DEFAULT_MODEL;
+      delete newEnv.MODEL_MAP;
+
+      set({ env: newEnv, selectedProvider: providerId });
+      await api.env.write(newEnv);
+
+      get().addLog({
+        id: `log-${Date.now()}`,
+        timestamp: new Date(),
+        level: 'info',
+        message: `切换至 provider: ${provider.name || providerId}`,
+      });
+
+      // Restart service if it's running
+      if (service.running && service.pid) {
+        await api.service.stop(service.pid);
+        const status = await api.service.start();
+        set({ service: status });
+        get().addLog({
+          id: `log-${Date.now()}`,
+          timestamp: new Date(),
+          level: 'success',
+          message: `服务已重启，端口: ${status.port}`,
+        });
+      }
+
+      set({ loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });
     }
