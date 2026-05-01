@@ -1,262 +1,147 @@
-# Codex CN Proxy - Mac 客户端应用
+# Codex CN Proxy
 
-将 Codex CLI / Desktop 新版使用的 OpenAI Responses API 转换成国内大模型的 Chat Completions API 的本地代理工具的可视化管理界面。
+将 Codex CLI / Desktop 的 OpenAI Responses API 转换为国内大模型 Chat Completions API 的本地代理工具。macOS 菜单栏应用，一键启停，无 Dock 占用。
 
 ## 功能
 
-- 🎛️ **一键启动/停止代理服务** - 无需命令行，轻松管理 Node.js 代理服务
-- 🤖️ **Provider 配置管理** - 通过选项卡快速配置不同的国内大模型（DeepSeek、Kimi、智谱等）
-- ⚙️ **环境配置可视化** - 直接在 GUI 中编辑 .env 配置，支持实时验证
-- 📊 **状态监控** - 实时查看服务运行状态、请求数量和日志
-- 🧪 **内置测试工具** - 发送测试请求，验证配置是否正确
+- **菜单栏托盘** — ∞ 图标常驻菜单栏，一级菜单直接启停代理
+- **无 Dock 图标** — 纯菜单栏应用，关闭窗口即隐藏，不占 Dock 空间
+- **Provider 管理** — 内置 DeepSeek、阿里百炼、智谱、Moonshot 等 6 个国内大模型配置
+- **模型映射** — 自动将 gpt-5、gpt-5-codex 等模型名映射为国内模型
+- **环境配置** — GUI 编辑 .env，支持实时保存
+- **调试日志** — 显示 `原模型 → 目标模型` 映射链路，方便排查
+- **测试工具** — 内置请求测试，验证配置是否正确
 
 ## 技术栈
 
-- **桌面框架：** Tauri 2.0
-- **前端框架：** React 18 + TypeScript
-- **UI 组件库：** shadcn/ui
-- **样式方案：** Tailwind CSS
-- **状态管理：** Zustand
-- **图标库：** Lucide React
-- **构建工具：** Vite
+- **桌面框架**：Tauri 2
+- **前端**：React 18 + TypeScript + Tailwind CSS
+- **状态管理**：Zustand
+- **构建**：Vite
+- **代理服务**：Node.js (CommonJS)
 
 ## 环境要求
 
-### 必需
-- Node.js 18.17+ (用于运行代理服务）
-- Rust 1.70+ (用于编译 Tauri 后端）
-- npm 9+ 或 yarn 1.22+
-- macOS 12+ (Darwin Monterey 或更高版本）
-
-### 可选
-- Tauri CLI（通过 npm 自动安装）
+- Node.js 18+
+- Rust 1.70+
+- macOS 12+
 
 ## 快速开始
-
-### 1. 克隆项目
 
 ```bash
 git clone https://github.com/your-username/codex-cn-proxy-app.git
 cd codex-cn-proxy-app
-```
-
-### 2. 安装依赖
-
-```bash
 npm install
 ```
 
-### 3. 准备配置
+### 配置
 
-在项目根目录创建 `server.js` 和配置文件：
-
-```bash
-# 从原项目复制或创建
-cp ../server.js .
-cp ../providers.json .
-cp .env.example .env
-```
-
-编辑 `.env` 文件，至少配置：
+应用启动后会自动创建 `~/.codex-cn-proxy/` 目录并复制初始文件。编辑 `~/.codex-cn-proxy/.env`：
 
 ```bash
 PROVIDER_PRESET=deepseek
-TARGET_API_KEY=sk-your-provider-key
+TARGET_API_KEY=sk-your-api-key
 ```
 
-### 4. 启动开发环境
+也可通过应用内「环境配置」标签页可视化编辑。
+
+### 开发
 
 ```bash
 npm run tauri dev
 ```
 
-这将同时启动：
-- Tauri 开发服务器（热重载）
-- Vite 前端开发服务器（热重载）
-
-### 5. 构建 macOS 应用
+### 构建
 
 ```bash
 npm run tauri build
 ```
 
-构建产物位于 `src-tauri/target/release/bundle/dmg/` 目录。
+构建产物：
+- `.app`：`src-tauri/target/release/bundle/macos/Codex CN Proxy.app`
+- `.dmg`：`src-tauri/target/release/bundle/dmg/Codex CN Proxy_1.0.0_aarch64.dmg`
 
-## 使用指南
+> DMG 创建需要 `hdiutil`，sandbox 环境需手动执行：`hdiutil create -srcfolder "Codex CN Proxy.app" -format UDZO -o output.dmg`
 
-### 配置 Provider
+## 使用方式
 
-1. 打开应用，点击 "Providers" 标签页
-2. 从左侧列表选择一个内置 Provider（DeepSeek、Moonshot 等）
-3. 或点击 "+ 自定义 Provider" 添加新的配置
-4. 编辑右侧表单中的参数：
-   - Base URL
-   - Chat Path
-   - Models Path
-   - Default Model
-   - Model Map（将 Codex 模型名映射到上游模型名）
-5. 点击 "保存配置"
-
-### 配置环境变量
-
-1. 点击 "环境配置" 标签页
-2. 配置以下参数：
-   - **Host / Port** - 本地服务地址
-   - **Proxy API Key** - 可选的本地代理鉴权
-   - **Provider Preset** - 选择上游 Provider
-   - **Target API Key** - 必填，上游服务的 API Key
-   - **Default Model** - 默认使用的模型
-   - **Request Timeout** - 请求超时时间（毫秒）
-   - **Log Upstream Request** - 是否记录上游请求摘要
-   - **MODEL_MAP** - 高级的模型名映射（JSON 格式）
-3. 点击 "保存并重启服务"
-
-### 监控服务状态
-
-1. 点击 "状态监控" 标签页
-2. 查看服务运行状态（运行中/已停止）
-3. 查看请求数量和平均延迟
-4. 实时查看日志，按颜色区分：
-   - 🟢 绿色：成功
-   - 🔴 红色：错误
-   - 🟡 橙色：警告
-   - ⚪ 灰色：信息
-
-### 测试连接
-
-1. 点击 "测试工具" 标签页
-2. 配置测试请求：
-   - Model：要测试的模型名
-   - Stream：是否使用流式响应
-   - Message：测试消息
-3. 点击 "发送测试请求"
-4. 查看响应结果：
-   - HTTP 状态码
-   - 响应延迟
-   - Token 使用量
-   - 响应内容
+| 操作 | 方式 |
+|------|------|
+| 启动代理 | 点击菜单栏 ∞ 图标 → Start Proxy |
+| 停止代理 | 点击菜单栏 ∞ 图标 → Stop Proxy |
+| 打开配置 | 点击菜单栏 ∞ 图标 → Show Settings |
+| 退出应用 | 点击菜单栏 ∞ 图标 → Quit |
+| 关闭窗口 | 窗口隐藏到后台，不退出 |
 
 ## 项目结构
 
 ```
 codex-cn-proxy-app/
 ├── src/                    # React 前端
-│   ├── components/
-│   │   ├── ui/           # shadcn/ui 基础组件
-│   │   ├── ProviderTab.tsx
-│   │   ├── EnvConfig.tsx
-│   │   ├── StatusMonitor.tsx
-│   │   └── TestTool.tsx
-│   ├── lib/
-│   │   ├── config.ts      # 类型定义
-│   │   ├── api.ts         # Tauri API 封装
-│   │   └── utils.ts       # 工具函数
-│   ├── store/
-│   │   └── appStore.ts   # Zustand 状态管理
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── index.css
-├── src-tauri/             # Tauri Rust 后端
+│   ├── components/         # UI 组件 (ProviderTab, EnvConfig, StatusMonitor, TestTool)
+│   ├── lib/                # 类型、API 封装、工具函数
+│   ├── store/              # Zustand 状态管理
+│   ├── App.tsx             # 主布局
+│   └── main.tsx            # React 入口
+├── src-tauri/              # Tauri Rust 后端
 │   ├── src/
-│   │   ├── lib.rs         # Tauri 命令入口
-│   │   ├── process.rs     # Node.js 进程管理
-│   │   └── config.rs      # 配置文件读写
+│   │   ├── lib.rs          # 托盘、命令、状态同步
+│   │   ├── process.rs      # Node.js 进程管理
+│   │   └── config.rs       # 配置文件读写
+│   ├── resources/          # 打包进 app bundle 的资源
+│   │   ├── providers.json  # Provider 预设配置
+│   │   └── server.cjs      # Node.js 代理服务
+│   ├── icons/              # 应用图标和托盘图标
 │   ├── Cargo.toml
 │   └── tauri.conf.json
-├── server.js              # Node.js 代理服务（从原项目复制）
-├── providers.json         # Provider 配置（从原项目复制）
-├── .env                  # 环境变量（从 .env.example 复制）
+├── server.cjs              # Node.js 代理服务（开发用）
 ├── package.json
-├── tsconfig.json
 └── vite.config.ts
 ```
 
 ## 内置 Provider
 
-应用内置了以下国内大模型的配置：
+- **DeepSeek** — `https://api.deepseek.com`
+- **阿里云百炼 (Dashscope)** — `https://dashscope.aliyuncs.com/compatible-mode`
+- **智谱 GLM (Zhipu)** — `https://open.bigmodel.cn/api/paas`
+- **Moonshot (Kimi)** — `https://api.moonshot.cn`
+- **MiniMax** — `https://api.minimax.io`
+- **火山方舟 Coding (Volcengine)** — `https://ark.cn-beijing.volces.com/api/coding/v3`
 
-- **DeepSeek** - https://api.deepseek.com
-- **Moonshot (Kimi)** - https://api.moonshot.cn
-- **智谱 GLM (Zhipu)** - https://open.bigmodel.cn/api/paas
-- **通义千问 (Dashscope)** - https://dashscope.aliyuncs.com/compatible-mode
-- **MiniMax** - https://api.minimax.io
-- **火山方舟 Coding (Volcengine)** - https://ark.cn-beijing.volces.com/api/coding/v3
+## 配置文件位置
 
-每个配置都预设了合理的默认参数，包括模型名映射。
-
-## 开发
-
-### 添加新的 UI 组件
-
-使用 shadcn/ui 风格创建新组件：
-
-```bash
-npx shadcn-ui@latest add [component-name]
-```
-
-### Tauri 命令
-
-在 `src-tauri/src/lib.rs` 中添加新的 Tauri 命令：
-
-```rust
-#[tauri::command]
-async fn my_command(param: String) -> Result<String, String> {
-    Ok(format!("Received: {}", param))
-}
-```
-
-然后在 Rust 中注册命令：
-
-```rust
-.invoke_handler(tauri::generate_handler![
-    my_command,
-    // ... 其他命令
-])
-```
-
-在前端调用：
-
-```typescript
-import { invoke } from '@tauri-apps/api/core';
-const result = await invoke<string>('my_command', { param: 'value' });
-```
+| 模式 | 位置 |
+|------|------|
+| 开发 (`tauri dev`) | 项目根目录 |
+| 生产 (`.app`) | `~/.codex-cn-proxy/`，首次启动自动创建并复制 |
 
 ## 故障排除
 
-### Tauri 构建失败
-
-确保已安装 Rust 工具链：
-
-```bash
-rustc --version
-cargo --version
-```
-
-如果缺少 Rust，从 https://rustup.rs/ 安装。
-
 ### 无法启动服务
 
-1. 检查 Node.js 是否正确安装：`node --version`
-2. 检查 `server.js` 是否存在于项目目录
-3. 检查 `.env` 配置是否正确，特别是 `TARGET_API_KEY`
-4. 查看状态监控中的日志获取详细错误信息
+1. 确认 Node.js 已安装：`node --version`
+2. 检查 `~/.codex-cn-proxy/.env` 中 `TARGET_API_KEY` 已配置
+3. 查看应用日志（Show Settings → 状态监控）
 
-### 配置保存失败
+### 托盘图标看不见
 
-1. 检查文件权限
-2. 确保 `providers.json` 和 `.env` 文件格式正确
-3. 尝试手动编辑这些文件然后重启应用
+检查菜单栏是否有 `∞` 图标。macOS 菜单栏拥挤时可能被隐藏，可按住 `⌘` 拖动调整位置。
+
+### 应用无法打开
+
+macOS 可能阻止未签名应用。在终端执行：
+```bash
+xattr -cr "/Applications/Codex CN Proxy.app"
+```
+
+## Windows 支持
+
+项目基于 Tauri 2 跨平台框架构建，Windows 适配需要：
+- 托盘图标（`.ico` 格式）
+- 配置目录改为 `%APPDATA%\codex-cn-proxy\`
+- 打包格式改为 `.msi`
+- 去除 macOS 专属 API（`LSUIElement`、`set_activation_policy`）
 
 ## 许可证
 
-MIT License - 见 LICENSE 文件
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 相关项目
-
-- [codex-cn-proxy](https://github.com/your-username/codex-cn-proxy) - 原始命令行代理工具
-- [Tauri](https://tauri.app/) - 桌面应用框架
-- [shadcn/ui](https://ui.shadcn.com/) - UI 组件库
+MIT License
