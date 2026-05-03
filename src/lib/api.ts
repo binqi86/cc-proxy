@@ -3,6 +3,7 @@ import type {
   ProviderConfig,
   EnvConfig,
   ServiceStatus,
+  AppStats,
   TestConfig,
   TestResult,
 } from './config';
@@ -12,6 +13,8 @@ export const api = {
     start: () => invoke<ServiceStatus>('start_service'),
     stop: (pid: number) => invoke<{ success: boolean }>('stop_service', { pid }),
     getStatus: () => invoke<ServiceStatus>('get_service_status'),
+    getStats: () => invoke<AppStats>('get_stats'),
+    pollLogs: () => invoke<string[]>('poll_proxy_logs'),
   },
 
   providers: {
@@ -27,5 +30,11 @@ export const api = {
 
   test: {
     connection: (config: TestConfig) => invoke<TestResult>('test_connection', { config }),
+  },
+
+  window: {
+    showMain: () => invoke<void>('show_main_window'),
+    quit: () => invoke<void>('quit_app'),
+    resetCount: () => invoke<number>('reset_request_count'),
   },
 };

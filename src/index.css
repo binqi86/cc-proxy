@@ -2,37 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark theme (default, no class needed) */
+/* Dark theme (default) */
 :root {
   --background: 10 14 20;
-  --foreground: 248 250 252;
-  --card: 19 26 36;
-  --card-foreground: 248 250 252;
-  --popover: 19 26 36;
-  --popover-foreground: 248 250 252;
+  --foreground: 237 237 239;
+  --card: 17 24 32;
+  --card-foreground: 237 237 239;
+  --popover: 17 24 32;
+  --popover-foreground: 237 237 239;
   --primary: 34 197 94;
   --primary-foreground: 10 14 20;
-  --secondary: 30 42 58;
-  --secondary-foreground: 248 250 252;
-  --muted: 23 32 44;
-  --muted-foreground: 148 163 184;
-  --accent: 30 42 58;
-  --accent-foreground: 248 250 252;
+  --secondary: 30 38 52;
+  --secondary-foreground: 237 237 239;
+  --muted: 20 28 40;
+  --muted-foreground: 138 143 152;
+  --accent: 28 38 52;
+  --accent-foreground: 237 237 239;
   --destructive: 239 68 68;
   --destructive-foreground: 255 255 255;
-  --border: 30 41 59;
-  --input: 30 41 59;
+  --border: 30 40 55;
+  --input: 30 40 55;
   --ring: 34 197 94;
-  --sidebar: 13 18 26;
-  --sidebar-foreground: 248 250 252;
-  --sidebar-accent: 24 34 48;
+  --sidebar: 12 18 26;
+  --sidebar-foreground: 237 237 239;
+  --sidebar-accent: 22 32 44;
   --sidebar-accent-foreground: 34 197 94;
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 }
 
-/* Light theme overrides */
+/* Light theme */
 .light {
-  --background: 248 250 252;
+  --background: 245 247 250;
   --foreground: 15 23 42;
   --card: 255 255 255;
   --card-foreground: 15 23 42;
@@ -61,7 +61,7 @@
 
 body {
   margin: 0; padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
@@ -71,7 +71,20 @@ body {
 
 #root { width: 100vw; height: 100vh; }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Glassmorphism utility */
+.glass {
+  background: rgba(18, 22, 30, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background-color: rgb(var(--border)); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--muted-foreground) / 0.5); }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(var(--muted-foreground), 0.4); }
+
+/* Popup window custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.1); border-radius: 2px; }

@@ -4,6 +4,7 @@ use std::env;
 pub struct ProxyProcess {
     pub pid: u32,
     pub port: u16,
+    pub log_rx: Option<std::sync::mpsc::Receiver<String>>,
 }
 
 pub fn start_proxy(config_path: &str) -> Result<ProxyProcess, String> {
@@ -18,15 +19,52 @@ pub fn start_proxy(config_path: &str) -> Result<ProxyProcess, String> {
 
     let port = detect_port_from_config(config_path);
 
-    let child = Command::new(&node_path)
+    let mut child = Command::new(&node_path)
         .arg(&server_js)
         .env("NODE_ENV", "production")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to start node process: {}", e))?;
 
+    let pid = child.id();
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    if let Some(stdout) = child.stdout.take() {
+        let tx = tx.clone();
+        std::thread::spawn(move || {
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                match line {
+                    Ok(l) => {
+                        if tx.send(l).is_err() { break; }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+    }
+
+    if let Some(stderr) = child.stderr.take() {
+        std::thread::spawn(move || {
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                match line {
+                    Ok(l) => {
+                        if tx.send(l).is_err() { break; }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+    }
+
     Ok(ProxyProcess {
-        pid: child.id(),
+        pid,
         port,
+        log_rx: Some(rx),
     })
 }
 
@@ -117,7 +155,7 @@ pub fn detect_running_proxy() -> Option<ProxyProcess> {
         for line in stdout.lines() {
             if line.contains(&format!(":{}", port)) && line.contains("LISTENING") {
                 let pid_str = line.split_whitespace().last()?;
-                if let Ok(pid) = pid_str.parse::<u32>() { return Some(ProxyProcess { pid, port }); }
+                if let Ok(pid) = pid_str.parse::<u32>() { return Some(ProxyProcess { pid, port, log_rx: None }); }
             }
         }
     } else {
@@ -125,14 +163,24 @@ pub fn detect_running_proxy() -> Option<ProxyProcess> {
             .args(["-i", &format!(":{}", port), "-t", "-sTCP:LISTEN"])
             .output().ok()?;
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if let Ok(pid) = stdout.parse::<u32>() { return Some(ProxyProcess { pid, port }); }
+        if let Ok(pid) = stdout.parse::<u32>() { return Some(ProxyProcess { pid, port, log_rx: None }); }
     }
     None
 }
 
 fn detect_port_from_env_config() -> u16 {
+    // Try cwd first
     if let Ok(dir) = std::env::current_dir() {
         let env_path = format!("{}/.env", dir.display());
+        if let Ok(env_map) = super::config::read_env(&env_path) {
+            if let Some(port_str) = env_map.get("PORT") {
+                return port_str.parse::<u16>().unwrap_or(8787);
+            }
+        }
+    }
+    // Fallback: check ~/.codex-cn-proxy/.env
+    if let Ok(home) = std::env::var("HOME") {
+        let env_path = format!("{}/.codex-cn-proxy/.env", home);
         if let Ok(env_map) = super::config::read_env(&env_path) {
             if let Some(port_str) = env_map.get("PORT") {
                 return port_str.parse::<u16>().unwrap_or(8787);

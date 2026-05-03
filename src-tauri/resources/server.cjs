@@ -17,13 +17,13 @@ const TARGET_BASE_URL = stripTrailingSlash(
 );
 const TARGET_CHAT_PATH = process.env.TARGET_CHAT_PATH || PRESET_DEFAULTS.chatPath || "/v1/chat/completions";
 const TARGET_MODELS_PATH = process.env.TARGET_MODELS_PATH || PRESET_DEFAULTS.modelsPath || "/v1/models";
-const TARGET_API_KEY = process.env.TARGET_API_KEY || "";
+const TARGET_API_KEY = process.env.TARGET_API_KEY || PRESET_DEFAULTS.apiKey || "";
 const PROXY_API_KEY = process.env.PROXY_API_KEY || "";
-const DEFAULT_MODEL = process.env.DEFAULT_MODEL || PRESET_DEFAULTS.defaultModel || "";
+const DEFAULT_MODEL = PRESET_DEFAULTS.defaultModel || process.env.DEFAULT_MODEL || "";
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 600000);
 const LOG_UPSTREAM_REQUEST = process.env.NODE_ENV === "development" || parseBooleanEnv("LOG_UPSTREAM_REQUEST");
 const MODEL_MAP = resolveModelMap(
-  { ...asObject(PRESET_DEFAULTS.modelMap), ...parseJsonEnv("MODEL_MAP", {}) },
+  { ...parseJsonEnv("MODEL_MAP", {}), ...asObject(PRESET_DEFAULTS.modelMap) },
   DEFAULT_MODEL
 );
 const TARGET_CHAT_URL = joinTargetUrl(TARGET_BASE_URL, TARGET_CHAT_PATH);
@@ -43,9 +43,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`codex-cn-proxy listening on http://${HOST}:${PORT}`);
-  if (PROVIDER_PRESET) console.log(`provider preset: ${PROVIDER_PRESET}`);
-  console.log(`target chat completions endpoint: ${TARGET_CHAT_URL}`);
+  console.log(`[PROXY_LOG]${JSON.stringify({ level: "info", event: "startup", ts: new Date().toISOString(), port: PORT, host: HOST, preset: PROVIDER_PRESET || null, target: TARGET_CHAT_URL, defaultModel: DEFAULT_MODEL || null, logUpstream: LOG_UPSTREAM_REQUEST })}`);
 });
 
 async function route(req, res) {
@@ -462,15 +460,21 @@ async function fetchChatCompletion(body) {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const startTime = Date.now();
   try {
     const upstreamBody = prepareUpstreamBody(body);
     logUpstreamRequest(body, upstreamBody);
-    return await fetch(TARGET_CHAT_URL, {
+    const response = await fetch(TARGET_CHAT_URL, {
       method: "POST",
       headers: upstreamHeaders(),
       body: JSON.stringify(upstreamBody),
       signal: controller.signal,
     });
+    logUpstreamResponse(response.status, Date.now() - startTime);
+    return response;
+  } catch (error) {
+    logUpstreamResponse(0, Date.now() - startTime, error);
+    throw error;
   } finally {
     clearTimeout(timer);
   }
@@ -1016,30 +1020,42 @@ function prependTextToContent(text, content) {
   return `${text}\n\n${messageContentToText(content)}`;
 }
 
-function logUpstreamRequest(originalBody, body) {
+function proxyLog(level, event, data) {
   if (!LOG_UPSTREAM_REQUEST) return;
+  console.log(`[PROXY_LOG]${JSON.stringify({ level, event, ts: new Date().toISOString(), ...data })}`);
+}
+
+function logUpstreamRequest(originalBody, body) {
   const sourceModel = originalBody.__originalModel;
   const targetModel = body.model;
   const modelLabel = sourceModel && sourceModel !== targetModel
     ? `${sourceModel} -> ${targetModel}`
     : targetModel;
-  console.log(
-    "upstream request:",
-    JSON.stringify({
-      model: modelLabel,
-      stream: body.stream,
-      omittedParams: Object.keys(originalBody).filter((key) => !(key in body)),
-      params: Object.keys(body).filter((key) => key !== "messages"),
-      messages: Array.isArray(body.messages)
-        ? body.messages.map((message) => ({
-            role: message.role,
-            contentType: Array.isArray(message.content) ? "array" : typeof message.content,
-            toolCalls: Array.isArray(message.tool_calls) ? message.tool_calls.length : 0,
-          }))
-        : [],
-      tools: Array.isArray(body.tools) ? body.tools.length : 0,
-    })
-  );
+  const msgCount = Array.isArray(body.messages) ? body.messages.length : 0;
+  const toolCount = Array.isArray(body.tools) ? body.tools.length : 0;
+
+  // Always include essentials for frontend display + counting
+  const data = {
+    model: modelLabel,
+    stream: Boolean(body.stream),
+    messages: msgCount,
+    tools: toolCount,
+  };
+  // Debug details only when toggle is on
+  if (LOG_UPSTREAM_REQUEST) {
+    data.params = Object.keys(body).filter(k => k !== "messages" && k !== "tools" && k !== "model" && k !== "stream");
+  }
+
+  console.log(`[PROXY_LOG]${JSON.stringify({ level: "info", event: "upstream_request", ts: new Date().toISOString(), ...data })}`);
+}
+
+function logUpstreamResponse(status, latencyMs, error) {
+  if (!LOG_UPSTREAM_REQUEST) return;
+  proxyLog(error ? "error" : "success", "upstream_response", {
+    status,
+    latency: latencyMs,
+    error: error ? error.message : undefined,
+  });
 }
 
 function getModelOption(model, optionName) {

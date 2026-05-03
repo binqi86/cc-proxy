@@ -24,45 +24,55 @@ export default function TestTool() {
   };
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <Card className="border-border">
+    <div className="space-y-5 max-w-2xl">
+      <Card className="border-border rounded-xl overflow-hidden">
         <CardHeader className="py-3 px-5 border-b border-border/50">
-          <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Request</CardTitle>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">测试请求</CardTitle>
         </CardHeader>
-        <CardContent className="p-5 space-y-3">
-          <Field label="Model">
+        <CardContent className="p-5 space-y-4">
+          <Field label="模型">
             <Input value={request.model} onChange={e => setRequest({ ...request, model: e.target.value })} placeholder="gpt-5" />
           </Field>
 
           <div className="flex items-center justify-between py-1">
             <div>
-              <Label className="text-sm">Stream</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Enable streaming response</p>
+              <Label className="text-sm">流式输出</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">启用流式响应</p>
             </div>
             <Switch checked={request.stream} onChange={e => setRequest({ ...request, stream: e.target.checked })} />
           </div>
 
-          <Field label="Message">
-            <Textarea value={request.message} onChange={e => setRequest({ ...request, message: e.target.value })} placeholder="Enter test message..." rows={4} />
-            <p className="text-[11px] text-muted-foreground text-right">{request.message.length} chars</p>
+          <Field label="消息内容">
+            <Textarea
+              value={request.message}
+              onChange={e => setRequest({ ...request, message: e.target.value })}
+              placeholder="输入测试消息..."
+              rows={4}
+              className="resize-none"
+            />
+            <p className="text-[11px] text-muted-foreground text-right">{request.message.length} 字符</p>
           </Field>
 
-          <Button className="w-full" onClick={handleTest} disabled={loading || !request.message.trim()}>
-            {loading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</> : <><Rocket className="w-3.5 h-3.5" /> Send Test Request</>}
+          <Button className="w-full h-10" onClick={handleTest} disabled={loading || !request.message.trim()}>
+            {loading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> 发送中...</>
+            ) : (
+              <><Rocket className="w-4 h-4" /> 发送测试请求</>
+            )}
           </Button>
         </CardContent>
       </Card>
 
       {result && (
-        <Card className="border-border animate-slide-up">
+        <Card className="border-border rounded-xl overflow-hidden animate-slide-up">
           <CardHeader className="py-3 px-5 border-b border-border/50">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Response</CardTitle>
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">响应结果</CardTitle>
           </CardHeader>
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               {result.success
-                ? <><CheckCircle2 className="w-4 h-4 text-primary" /><Badge variant="success">Success</Badge></>
-                : <><XCircle className="w-4 h-4 text-destructive" /><Badge variant="destructive">Failed</Badge></>
+                ? <><CheckCircle2 className="w-4 h-4 text-primary" /><Badge variant="success">成功</Badge></>
+                : <><XCircle className="w-4 h-4 text-destructive" /><Badge variant="destructive">失败</Badge></>
               }
               {result.status && <Badge variant="outline">HTTP {result.status}</Badge>}
               {result.latency && <span className="text-xs text-muted-foreground">{result.latency}ms</span>}
@@ -70,23 +80,33 @@ export default function TestTool() {
 
             {result.response && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Response Body</Label>
-                <div className="bg-muted rounded-md p-4 text-[13px] whitespace-pre-wrap max-h-[300px] overflow-auto font-mono">{result.response}</div>
+                <Label className="text-xs text-muted-foreground">响应内容</Label>
+                <div className="bg-muted/50 rounded-lg p-4 text-[13px] whitespace-pre-wrap max-h-[300px] overflow-auto font-mono">
+                  {result.response}
+                </div>
               </div>
             )}
 
             {result.tokens && (
               <div className="grid grid-cols-3 gap-3">
-                {[['Input', result.tokens.input], ['Output', result.tokens.output], ['Total', result.tokens.total]].map(([label, val]) => (
-                  <div key={label as string} className="bg-muted rounded-md p-3 text-center">
-                    <div className="text-lg font-semibold">{val as number}</div>
+                {[
+                  ['输入', result.tokens.input],
+                  ['输出', result.tokens.output],
+                  ['总计', result.tokens.total],
+                ].map(([label, val]) => (
+                  <div key={label as string} className="bg-muted/50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold">{val as number}</div>
                     <div className="text-[11px] text-muted-foreground">{label as string}</div>
                   </div>
                 ))}
               </div>
             )}
 
-            {result.error && <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-md px-4 py-3 text-[13px]">{result.error}</div>}
+            {result.error && (
+              <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg px-4 py-3 text-[13px]">
+                {result.error}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

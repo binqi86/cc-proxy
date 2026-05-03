@@ -10,8 +10,10 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
+        "label": "main",
         "title": "Codex CN Proxy",
         "width": 1200,
         "height": 800,
@@ -21,8 +23,7 @@
         "fullscreen": false,
         "center": true,
         "decorations": true,
-        "hiddenTitle": true,
-        "titleBarStyle": "Overlay"
+        "titleBarStyle": "Visible"
       }
     ],
     "security": {

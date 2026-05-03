@@ -32,6 +32,13 @@ export interface ServiceStatus {
   uptime?: number;
 }
 
+export interface AppStats {
+  running: boolean;
+  pid?: number;
+  port?: number;
+  request_count: number;
+}
+
 export interface LogEntry {
   id: string;
   timestamp: Date;
@@ -56,4 +63,4 @@ export interface TestResult {
   error?: string;
 }
 
-export type TabName = 'providers' | 'env' | 'status' | 'test';
+export type NavItem = 'overview' | 'providers' | 'env' | 'status' | 'test';

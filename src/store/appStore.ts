@@ -5,7 +5,7 @@ import type {
   EnvConfig,
   ServiceStatus,
   LogEntry,
-  TabName,
+  NavItem,
 } from '@/lib/config';
 
 interface AppState {
@@ -14,9 +14,10 @@ interface AppState {
   env: EnvConfig;
   selectedProvider: string;
   logs: LogEntry[];
-  activeTab: TabName;
+  activeNav: NavItem;
   loading: boolean;
   error: string | null;
+  requestCount: number;
 
   setServiceStatus: (status: ServiceStatus) => void;
   setProviders: (providers: Record<string, ProviderConfig>) => void;
@@ -24,9 +25,10 @@ interface AppState {
   setSelectedProvider: (id: string) => void;
   addLog: (log: LogEntry) => void;
   clearLogs: () => void;
-  setActiveTab: (tab: TabName) => void;
+  setActiveNav: (nav: NavItem) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setRequestCount: (count: number) => void;
 
   loadConfig: () => Promise<void>;
   saveProviders: () => Promise<void>;
@@ -42,9 +44,10 @@ const useAppStore = create<AppState>((set, get) => ({
   env: {},
   selectedProvider: 'deepseek',
   logs: [],
-  activeTab: 'providers',
+  activeNav: 'overview',
   loading: false,
   error: null,
+  requestCount: 0,
 
   setServiceStatus: (status) => set({ service: status }),
   setProviders: (providers) => set({ providers }),
@@ -52,9 +55,10 @@ const useAppStore = create<AppState>((set, get) => ({
   setSelectedProvider: (id) => set({ selectedProvider: id }),
   addLog: (log) => set((state) => ({ logs: [...state.logs, log] })),
   clearLogs: () => set({ logs: [] }),
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveNav: (nav) => set({ activeNav: nav }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
+  setRequestCount: (count) => set({ requestCount: count }),
 
   loadConfig: async () => {
     try {
@@ -144,7 +148,7 @@ const useAppStore = create<AppState>((set, get) => ({
       const { providers, env, service } = get();
       const provider = providers[providerId];
       if (!provider) {
-        set({ error: `Provider "${providerId}" not found`, loading: false });
+        set({ error: `供应商 "${providerId}" 不存在`, loading: false });
         return;
       }
 
@@ -153,7 +157,6 @@ const useAppStore = create<AppState>((set, get) => ({
         PROVIDER_PRESET: providerId,
         TARGET_API_KEY: provider.apiKey || (env as Record<string, string>).TARGET_API_KEY || '',
       };
-      // 清除 env 级别的覆盖项，统一使用 provider 配置
       delete newEnv.DEFAULT_MODEL;
       delete newEnv.MODEL_MAP;
 
@@ -164,10 +167,9 @@ const useAppStore = create<AppState>((set, get) => ({
         id: `log-${Date.now()}`,
         timestamp: new Date(),
         level: 'info',
-        message: `切换至 provider: ${provider.name || providerId}`,
+        message: `切换至供应商: ${provider.name || providerId}`,
       });
 
-      // Restart service if it's running
       if (service.running && service.pid) {
         await api.service.stop(service.pid);
         const status = await api.service.start();

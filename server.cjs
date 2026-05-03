@@ -1026,7 +1026,6 @@ function proxyLog(level, event, data) {
 }
 
 function logUpstreamRequest(originalBody, body) {
-  if (!LOG_UPSTREAM_REQUEST) return;
   const sourceModel = originalBody.__originalModel;
   const targetModel = body.model;
   const modelLabel = sourceModel && sourceModel !== targetModel
@@ -1035,13 +1034,19 @@ function logUpstreamRequest(originalBody, body) {
   const msgCount = Array.isArray(body.messages) ? body.messages.length : 0;
   const toolCount = Array.isArray(body.tools) ? body.tools.length : 0;
 
-  proxyLog("info", "upstream_request", {
+  // Always include essentials for frontend display + counting
+  const data = {
     model: modelLabel,
     stream: Boolean(body.stream),
     messages: msgCount,
     tools: toolCount,
-    params: Object.keys(body).filter(k => k !== "messages" && k !== "tools" && k !== "model" && k !== "stream"),
-  });
+  };
+  // Debug details only when toggle is on
+  if (LOG_UPSTREAM_REQUEST) {
+    data.params = Object.keys(body).filter(k => k !== "messages" && k !== "tools" && k !== "model" && k !== "stream");
+  }
+
+  console.log(`[PROXY_LOG]${JSON.stringify({ level: "info", event: "upstream_request", ts: new Date().toISOString(), ...data })}`);
 }
 
 function logUpstreamResponse(status, latencyMs, error) {
