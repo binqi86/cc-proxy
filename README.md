@@ -1,10 +1,6 @@
 # cc-proxy
 
 <p align="center">
-  <a href="README.md">简体中文</a>
-</p>
-
-<p align="center">
   <a href="https://github.com/chenyubinqi/cc-proxy/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/chenyubinqi/cc-proxy?style=social"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/chenyubinqi/cc-proxy"></a>
   <a href="https://nodejs.org/"><img alt="Node.js" src="https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js"></a>
@@ -32,13 +28,7 @@ cc-proxy 是面向 Claude Code / Codex CLI 的本地大模型代理工具。它�
 
 ## 下载
 
-最新版本在 GitHub Releases：
-
-```text
-https://github.com/chenyubinqi/cc-proxy/releases/latest
-```
-
-推荐下载：
+前往 [GitHub Releases](https://github.com/chenyubinqi/cc-proxy/releases) 下载最新版本：
 
 - `cc-proxy-v<version>-macOS-arm64.dmg`：macOS 拖拽安装包
 
