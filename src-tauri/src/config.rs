@@ -54,7 +54,7 @@ pub fn read_env(path: &str) -> Result<std::collections::HashMap<String, String>,
 }
 
 pub fn write_env(path: &str, env: &std::collections::HashMap<String, String>) -> Result<(), String> {
-    let mut lines = vec!["# Codex CN Proxy Environment".to_string()];
+    let mut lines = vec!["# cc-proxy Environment".to_string()];
 
     let ordered_keys = vec![
         "HOST",
@@ -67,8 +67,8 @@ pub fn write_env(path: &str, env: &std::collections::HashMap<String, String>) ->
         "TARGET_MODELS_PATH",
         "DEFAULT_MODEL",
         "REQUEST_TIMEOUT_MS",
-        "LOG_UPSTREAM_REQUEST",
         "MODEL_MAP",
+        "MAX_REQUEST_BODY_SIZE",
     ];
 
     for key in ordered_keys {

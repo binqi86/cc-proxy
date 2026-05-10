@@ -178,9 +178,9 @@ fn detect_port_from_env_config() -> u16 {
             }
         }
     }
-    // Fallback: check ~/.codex-cn-proxy/.env
+    // Fallback: check ~/.cc-proxy/.env
     if let Ok(home) = std::env::var("HOME") {
-        let env_path = format!("{}/.codex-cn-proxy/.env", home);
+        let env_path = format!("{}/.cc-proxy/.env", home);
         if let Ok(env_map) = super::config::read_env(&env_path) {
             if let Some(port_str) = env_map.get("PORT") {
                 return port_str.parse::<u16>().unwrap_or(8787);

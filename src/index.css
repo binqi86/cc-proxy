@@ -1,90 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Dark theme (default) */
+/* ── Dark theme (default) — cc-desktop-switch palette ── */
 :root {
-  --background: 10 14 20;
-  --foreground: 237 237 239;
-  --card: 17 24 32;
-  --card-foreground: 237 237 239;
-  --popover: 17 24 32;
-  --popover-foreground: 237 237 239;
-  --primary: 34 197 94;
-  --primary-foreground: 10 14 20;
-  --secondary: 30 38 52;
-  --secondary-foreground: 237 237 239;
-  --muted: 20 28 40;
-  --muted-foreground: 138 143 152;
-  --accent: 28 38 52;
-  --accent-foreground: 237 237 239;
-  --destructive: 239 68 68;
+  --background: 17 19 24;
+  --foreground: 248 250 252;
+  --card: 23 26 33;
+  --card-foreground: 248 250 252;
+  --popover: 23 26 33;
+  --popover-foreground: 248 250 252;
+  --primary: 96 165 250;
+  --primary-foreground: 255 255 255;
+  --secondary: 32 36 45;
+  --secondary-foreground: 170 178 192;
+  --muted: 32 36 45;
+  --muted-foreground: 170 178 192;
+  --accent: 32 36 45;
+  --accent-foreground: 248 250 252;
+  --destructive: 251 113 133;
   --destructive-foreground: 255 255 255;
-  --border: 30 40 55;
-  --input: 30 40 55;
-  --ring: 34 197 94;
-  --sidebar: 12 18 26;
-  --sidebar-foreground: 237 237 239;
-  --sidebar-accent: 22 32 44;
-  --sidebar-accent-foreground: 34 197 94;
-  --radius: 0.625rem;
+  --border: 45 52 64;
+  --input: 45 52 64;
+  --ring: 96 165 250;
+  --radius: 1.125rem;
+
+  /* cc-desktop-switch extras */
+  --success: 52 211 153;
+  --warning: 251 191 36;
+  --primary-soft: 96 165 250;
+  --primary-soft-alpha: 0.18;
+  --success-soft-alpha: 0.16;
 }
 
-/* Light theme */
+/* ── Light theme ── */
 .light {
-  --background: 245 247 250;
-  --foreground: 15 23 42;
+  --background: 255 255 255;
+  --foreground: 17 24 39;
   --card: 255 255 255;
-  --card-foreground: 15 23 42;
+  --card-foreground: 17 24 39;
   --popover: 255 255 255;
-  --popover-foreground: 15 23 42;
-  --primary: 22 163 74;
+  --popover-foreground: 17 24 39;
+  --primary: 20 118 255;
   --primary-foreground: 255 255 255;
-  --secondary: 241 245 249;
-  --secondary-foreground: 15 23 42;
-  --muted: 241 245 249;
-  --muted-foreground: 100 116 139;
-  --accent: 241 245 249;
-  --accent-foreground: 15 23 42;
-  --destructive: 239 68 68;
+  --secondary: 247 248 251;
+  --secondary-foreground: 17 24 39;
+  --muted: 247 248 251;
+  --muted-foreground: 102 112 133;
+  --accent: 247 248 251;
+  --accent-foreground: 17 24 39;
+  --destructive: 255 77 79;
   --destructive-foreground: 255 255 255;
-  --border: 226 232 240;
-  --input: 226 232 240;
-  --ring: 22 163 74;
-  --sidebar: 248 250 252;
-  --sidebar-foreground: 15 23 42;
-  --sidebar-accent: 226 232 240;
-  --sidebar-accent-foreground: 22 163 74;
+  --border: 228 231 236;
+  --input: 228 231 236;
+  --ring: 20 118 255;
+
+  --success: 22 163 74;
+  --warning: 245 158 11;
+  --primary-soft: 20 118 255;
+  --primary-soft-alpha: 0.12;
+  --success-soft-alpha: 0.12;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0; padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px; line-height: 1.5;
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-  font-size: 14px; line-height: 1.5;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root { width: 100vw; height: 100vh; }
 
-/* Glassmorphism utility */
-.glass {
-  background: rgba(18, 22, 30, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-/* Custom scrollbar */
+/* ── Custom scrollbar ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background-color: rgb(var(--border)); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(var(--muted-foreground), 0.4); }
 
-/* Popup window custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.1); border-radius: 2px; }
+/* ── cc-desktop-switch utility classes ── */
+
+/* Pill tab (route-tab) */
+.route-tabs {
+  @apply flex items-center gap-1 p-1 rounded-2xl;
+  background: rgb(var(--muted) / 0.5);
+}
+.route-tab {
+  @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-150;
+  color: rgb(var(--muted-foreground));
+}
+.route-tab:hover {
+  color: rgb(var(--foreground));
+  background: rgb(var(--background) / 0.6);
+}
+.route-tab.active {
+  color: rgb(var(--primary));
+  background: rgb(var(--background));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* Panel (card with border) */
+.panel {
+  background: rgb(var(--card));
+  border: 1px solid rgb(var(--border) / 0.6);
+  border-radius: var(--radius);
+}
+
+/* Status card */
+.status-card {
+  @apply panel text-center flex flex-col items-center justify-center gap-3;
+  min-height: 180px;
+  padding: 28px 20px;
+}
+.status-card .status-icon {
+  @apply grid place-items-center rounded-full;
+  width: 56px; height: 56px;
+  font-size: 28px;
+}
+.status-card .status-value {
+  @apply font-extrabold tracking-tight;
+  font-size: 28px;
+  color: rgb(var(--foreground));
+}
+.status-card .status-label {
+  @apply text-sm font-semibold;
+  color: rgb(var(--muted-foreground));
+}
+
+/* Settings row */
+.settings-panel {
+  @apply panel overflow-hidden;
+}
+.settings-row {
+  @apply grid items-center gap-4 px-5 py-3.5;
+  grid-template-columns: 1fr auto;
+  min-height: 56px;
+  border-bottom: 1px solid rgb(var(--border) / 0.5);
+}
+.settings-row:last-child { border-bottom: 0; }
+.settings-row .settings-label {
+  @apply text-[13px] font-semibold;
+  color: rgb(var(--muted-foreground));
+}
+
+/* Terminal panel */
+.terminal-panel {
+  background: #0c1222;
+  border: 1px solid rgb(var(--border) / 0.3);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Provider switch card */
+.provider-switch-card {
+  @apply flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-150;
+  border-color: rgb(var(--border) / 0.6);
+  background: rgb(var(--card));
+}
+.provider-switch-card:hover {
+  border-color: rgb(var(--primary) / 0.3);
+}
+.provider-switch-card.active {
+  border-color: rgb(var(--primary) / 0.4);
+  background: linear-gradient(90deg, rgb(var(--primary) / 0.08), transparent 60%);
+}
+
+/* Activity row */
+.activity-row {
+  @apply grid items-center gap-3 px-5 py-3 text-[13px];
+  grid-template-columns: 16px 80px 1fr auto;
+  border-bottom: 1px solid rgb(var(--border) / 0.3);
+}
+.activity-row:last-child { border-bottom: 0; }
+.activity-row::before {
+  content: '';
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgb(var(--success));
+}
+
+/* Page transition */
+.page-enter {
+  animation: pageIn 0.15s ease-out;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

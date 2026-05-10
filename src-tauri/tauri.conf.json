@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.0",
-  "productName": "Codex CN Proxy",
+  "productName": "cc-proxy",
   "version": "1.0.0",
-  "identifier": "com.codex-cn-proxy.desktop",
+  "identifier": "com.cc-proxy.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Codex CN Proxy",
+        "title": "cc-proxy",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
@@ -48,8 +48,8 @@
       "signingIdentity": null
     },
     "targets": "all",
-    "shortDescription": "Codex CN Proxy 本地服务管理工具",
-    "longDescription": "将 Codex 的 OpenAI Responses API 转换成国内大模型的 Chat Completions API 的本地代理工具",
+    "shortDescription": "cc-proxy - 本地大模型代理管理工具",
+    "longDescription": "将 OpenAI / Anthropic 协议转为国内大模型 API 的本地代理工具，macOS 菜单栏一键启停",
     "externalBin": [],
     "resources": ["resources/providers.json", "resources/server.cjs"]
   },

@@ -6,6 +6,10 @@ import type {
   ServiceStatus,
   LogEntry,
   NavItem,
+  ActiveMode,
+  ClaudeConfigStatus,
+  LocalizationStatus,
+  ClaudeModelEntry,
 } from '@/lib/config';
 
 interface AppState {
@@ -15,20 +19,28 @@ interface AppState {
   selectedProvider: string;
   logs: LogEntry[];
   activeNav: NavItem;
+  activeMode: ActiveMode;
   loading: boolean;
   error: string | null;
   requestCount: number;
+  claudeConfigStatus: ClaudeConfigStatus | null;
+  localizationStatus: LocalizationStatus | null;
 
   setServiceStatus: (status: ServiceStatus) => void;
   setProviders: (providers: Record<string, ProviderConfig>) => void;
   setEnv: (env: EnvConfig) => void;
   setSelectedProvider: (id: string) => void;
+  editingProviderId: string | null;
+  setEditingProviderId: (id: string | null) => void;
   addLog: (log: LogEntry) => void;
   clearLogs: () => void;
   setActiveNav: (nav: NavItem) => void;
+  setActiveMode: (mode: ActiveMode) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setRequestCount: (count: number) => void;
+  setClaudeConfigStatus: (status: ClaudeConfigStatus) => void;
+  setLocalizationStatus: (status: LocalizationStatus) => void;
 
   loadConfig: () => Promise<void>;
   saveProviders: () => Promise<void>;
@@ -36,6 +48,48 @@ interface AppState {
   startService: () => Promise<void>;
   stopService: () => Promise<void>;
   switchActiveProvider: (providerId: string) => Promise<void>;
+
+  loadClaudeStatus: () => Promise<void>;
+  applyClaude3pConfig: () => Promise<void>;
+  removeClaude3pConfig: () => Promise<void>;
+  applyLocalization: () => Promise<void>;
+  restoreLocalization: () => Promise<void>;
+}
+
+function getClaudeModels(providers: Record<string, ProviderConfig>, env: EnvConfig): ClaudeModelEntry[] {
+  const presetId = env.PROVIDER_PRESET || '';
+  const provider = providers[presetId];
+  const claudeMap = provider?.claudeModelMap || {};
+  const entries: ClaudeModelEntry[] = [];
+
+  const slotNames: Record<string, string> = {
+    'sonnet': 'claude-sonnet-4-6',
+    'haiku': 'claude-haiku-4-6',
+    'opus': 'claude-opus-4-6',
+    'default': 'claude-default',
+  };
+
+  for (const [slot, displayName] of Object.entries(slotNames)) {
+    const mappedModel = claudeMap[slot];
+    if (mappedModel) {
+      entries.push({
+        name: `claude-${mappedModel.replace(/[^a-zA-Z0-9-]/g, '-')}`,
+        display_name: displayName,
+        supports_1m: mappedModel.endsWith('[1m]'),
+      });
+    }
+  }
+
+  if (entries.length === 0) {
+    const defaultModel = provider?.defaultModel || 'claude-sonnet-4-6';
+    entries.push({
+      name: defaultModel,
+      display_name: 'Default',
+      supports_1m: false,
+    });
+  }
+
+  return entries;
 }
 
 const useAppStore = create<AppState>((set, get) => ({
@@ -44,21 +98,29 @@ const useAppStore = create<AppState>((set, get) => ({
   env: {},
   selectedProvider: 'deepseek',
   logs: [],
-  activeNav: 'overview',
+  activeNav: 'dashboard',
+  activeMode: 'codex',
   loading: false,
   error: null,
   requestCount: 0,
+  claudeConfigStatus: null,
+  localizationStatus: null,
 
   setServiceStatus: (status) => set({ service: status }),
   setProviders: (providers) => set({ providers }),
   setEnv: (env) => set({ env }),
   setSelectedProvider: (id) => set({ selectedProvider: id }),
+  editingProviderId: null as string | null,
+  setEditingProviderId: (id: string | null) => set({ editingProviderId: id }),
   addLog: (log) => set((state) => ({ logs: [...state.logs, log] })),
   clearLogs: () => set({ logs: [] }),
   setActiveNav: (nav) => set({ activeNav: nav }),
+  setActiveMode: (mode) => set({ activeMode: mode }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   setRequestCount: (count) => set({ requestCount: count }),
+  setClaudeConfigStatus: (status) => set({ claudeConfigStatus: status }),
+  setLocalizationStatus: (status) => set({ localizationStatus: status }),
 
   loadConfig: async () => {
     try {
@@ -183,6 +245,96 @@ const useAppStore = create<AppState>((set, get) => ({
       }
 
       set({ loading: false });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  // ── Claude actions ──
+
+  loadClaudeStatus: async () => {
+    try {
+      const [configStatus, locStatus] = await Promise.all([
+        api.claude.getConfigStatus(),
+        api.localization.getStatus(),
+      ]);
+      set({ claudeConfigStatus: configStatus, localizationStatus: locStatus });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  applyClaude3pConfig: async () => {
+    try {
+      set({ loading: true, error: null });
+      const { env, providers } = get();
+      const port = parseInt(env.PORT || '8088', 10);
+      const apiKey = env.PROXY_API_KEY || 'proxy';
+      const models = getClaudeModels(providers, env);
+
+      await api.claude.apply3pConfig(port, apiKey, models);
+      const status = await api.claude.getConfigStatus();
+      set({ claudeConfigStatus: status, loading: false });
+      get().addLog({
+        id: `log-${Date.now()}`,
+        timestamp: new Date(),
+        level: 'success',
+        message: 'Claude Desktop 3P 配置已应用',
+      });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  removeClaude3pConfig: async () => {
+    try {
+      set({ loading: true, error: null });
+      await api.claude.remove3pConfig();
+      const status = await api.claude.getConfigStatus();
+      set({ claudeConfigStatus: status, loading: false });
+      get().addLog({
+        id: `log-${Date.now()}`,
+        timestamp: new Date(),
+        level: 'info',
+        message: 'Claude Desktop 3P 配置已移除',
+      });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  applyLocalization: async () => {
+    try {
+      set({ loading: true, error: null });
+      const zhCN = '{}'; // placeholder - actual translations loaded from bundle
+      const desktop = '{}';
+      const statsig = '{}';
+      await api.localization.apply(zhCN, desktop, statsig);
+      const status = await api.localization.getStatus();
+      set({ localizationStatus: status, loading: false });
+      get().addLog({
+        id: `log-${Date.now()}`,
+        timestamp: new Date(),
+        level: 'success',
+        message: 'Claude Desktop 汉化已应用',
+      });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  restoreLocalization: async () => {
+    try {
+      set({ loading: true, error: null });
+      await api.localization.restore();
+      const status = await api.localization.getStatus();
+      set({ localizationStatus: status, loading: false });
+      get().addLog({
+        id: `log-${Date.now()}`,
+        timestamp: new Date(),
+        level: 'info',
+        message: 'Claude Desktop 汉化已恢复',
+      });
     } catch (e) {
       set({ error: String(e), loading: false });
     }

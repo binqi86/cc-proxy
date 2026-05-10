@@ -1,6 +1,8 @@
 #![allow(unexpected_cfgs)]
 mod config;
 mod process;
+mod claude_config;
+mod localization;
 
 use std::sync::Mutex;
 use std::collections::HashMap;
@@ -76,7 +78,7 @@ fn config_dir() -> String {
     }
     // 2. Home directory config
     if let Ok(home) = std::env::var("HOME") {
-        let config_path = std::path::PathBuf::from(&home).join(".codex-cn-proxy");
+        let config_path = std::path::PathBuf::from(&home).join(".cc-proxy");
         if !config_path.exists() {
             let _ = std::fs::create_dir_all(&config_path);
             copy_bundled_resources_to(&config_path);
@@ -141,7 +143,7 @@ fn update_tray_icon(app: &AppHandle, running: bool) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_icon(Some(Image::from_bytes(icon_bytes).unwrap()));
         let _ = tray.set_tooltip(Some(
-            if running { "Codex CN Proxy - 运行中" } else { "Codex CN Proxy - 已停止" }
+            if running { "cc-proxy - 运行中" } else { "cc-proxy - 已停止" }
         ));
     }
 }
@@ -192,7 +194,7 @@ fn create_popup_window(app: &AppHandle) {
         POPUP_LABEL,
         tauri::WebviewUrl::App("index.html?window=popup".into()),
     )
-    .title("Codex CN Proxy")
+    .title("cc-proxy")
     .inner_size(340.0, 440.0)
     .resizable(false)
     .decorations(false)
@@ -283,24 +285,14 @@ async fn start_service(
         let req_count = state.request_count.clone();
         std::thread::spawn(move || {
             for line in rx {
-                let mut skip = false;
-                if let Some(json_str) = line.strip_prefix("[PROXY_LOG]") {
-                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
-                        let event = parsed.get("event").and_then(|v| v.as_str()).unwrap_or("");
-                        // Count upstream requests
-                        if event == "upstream_request" {
-                            let count = *req_count.lock().unwrap() + 1;
-                            *req_count.lock().unwrap() = count;
-                        }
-                        // Skip successful upstream_response (noisy, counted above)
-                        if event == "upstream_response" && parsed.get("status").and_then(|v| v.as_u64()) == Some(200) {
-                            skip = true;
-                        }
+                if let Some(rest) = line.strip_prefix("[PROXY_LOG]") {
+                    // Count upstream requests (lines starting with →)
+                    if rest.trim_start().starts_with('→') {
+                        let count = *req_count.lock().unwrap() + 1;
+                        *req_count.lock().unwrap() = count;
                     }
                 }
-                if !skip {
-                    logs.lock().unwrap().push(line);
-                }
+                logs.lock().unwrap().push(line);
             }
         });
     }
@@ -493,6 +485,174 @@ async fn reset_request_count(state: tauri::State<'_, AppState>) -> Result<u64, S
     Ok(old)
 }
 
+// ── Claude Desktop 3P config commands ──
+
+#[tauri::command]
+async fn get_claude_config_status() -> Result<claude_config::ClaudeConfigStatus, String> {
+    let port = read_configured_port();
+    let gateway_url = format!("http://127.0.0.1:{}", port);
+    Ok(claude_config::get_claude_config_status(&gateway_url))
+}
+
+#[tauri::command]
+async fn apply_claude_3p_config(
+    port: u16,
+    api_key: String,
+    models: Vec<claude_config::ClaudeModelEntry>,
+) -> Result<String, String> {
+    claude_config::write_claude_3p_config(port, &api_key, &models)
+}
+
+#[tauri::command]
+async fn remove_claude_3p_config() -> Result<(), String> {
+    claude_config::remove_claude_3p_config()
+}
+
+#[tauri::command]
+async fn restart_claude_desktop() -> Result<String, String> {
+    claude_config::restart_claude_desktop()
+}
+
+// ── Chinese localization commands ──
+
+#[tauri::command]
+async fn get_localization_status() -> Result<localization::LocalizationStatus, String> {
+    Ok(localization::get_localization_status())
+}
+
+#[tauri::command]
+async fn apply_chinese_localization(
+    zh_cn_json: String,
+    desktop_json: String,
+    statsig_json: String,
+) -> Result<String, String> {
+    localization::apply_chinese_localization(&zh_cn_json, &desktop_json, &statsig_json)
+}
+
+#[tauri::command]
+async fn restore_chinese_localization() -> Result<String, String> {
+    localization::restore_chinese_localization()
+}
+
+// ── Balance query ──
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BalanceResult {
+    supported: bool,
+    balance: Option<String>,
+    message: String,
+}
+
+fn get_balance_endpoint(base_url: &str, provider_id: &str) -> Option<String> {
+    let lower = format!("{} {}", provider_id, base_url).to_lowercase();
+    if lower.contains("deepseek") {
+        Some("https://api.deepseek.com/user/balance".into())
+    } else if lower.contains("siliconflow") {
+        Some("https://api.siliconflow.cn/v1/user/info".into())
+    } else if lower.contains("openrouter") {
+        Some("https://openrouter.ai/api/v1/credits".into())
+    } else if lower.contains("novita") {
+        Some("https://api.novita.ai/v3/user/balance".into())
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+async fn query_provider_balance(
+    provider_id: String,
+    base_url: String,
+    api_key: String,
+) -> Result<BalanceResult, String> {
+    let endpoint = match get_balance_endpoint(&base_url, &provider_id) {
+        Some(e) => e,
+        None => return Ok(BalanceResult {
+            supported: false,
+            balance: None,
+            message: "此供应商暂未适配余额查询".into(),
+        }),
+    };
+
+    let client = reqwest::Client::new();
+    match client
+        .get(&endpoint)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .timeout(std::time::Duration::from_secs(8))
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                return Ok(BalanceResult {
+                    supported: true,
+                    balance: None,
+                    message: format!("余额接口返回 HTTP {}", resp.status().as_u16()),
+                });
+            }
+            match resp.json::<serde_json::Value>().await {
+                Ok(payload) => {
+                    // Try to extract balance from various response formats
+                    let _balance = payload.get("balance_infos")
+                        .and_then(|v| v.as_array())
+                        .and_then(|arr| arr.first())
+                        .and_then(|item| item.get("total_balance"))
+                        .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|_| "").or(Some(""))))
+                        .or_else(|| {
+                            payload.get("data").or_else(|| Some(&payload))
+                                .and_then(|d| d.get("total_credits").or(d.get("balance")).or(d.get("total_balance")))
+                                .and_then(|v| v.as_f64())
+                                .map(|_f| "")
+                        })
+                        .or_else(|| {
+                            let d = payload.get("data").unwrap_or(&payload);
+                            d.get("balance").or(d.get("total_balance")).or(d.get("total_granted"))
+                                .and_then(|v| v.as_f64())
+                                .map(|_| "")
+                        });
+
+                    let balance_str = if let Some(raw_val) = payload
+                        .get("balance_infos")
+                        .and_then(|v| v.as_array())
+                        .and_then(|arr| arr.first())
+                        .and_then(|item| item.get("total_balance"))
+                    {
+                        let currency = payload.get("balance_infos")
+                            .and_then(|v| v.as_array())
+                            .and_then(|arr| arr.first())
+                            .and_then(|item| item.get("currency").and_then(|c| c.as_str()))
+                            .unwrap_or("CNY");
+                        Some(format!("{} {}", raw_val, currency))
+                    } else if let Some(b) = payload.get("data").or_else(|| Some(&payload))
+                        .and_then(|d| d.get("total_credits").or(d.get("balance")).or(d.get("total_balance")))
+                        .and_then(|v| v.as_f64())
+                    {
+                        Some(format!("${:.2}", b))
+                    } else {
+                        None
+                    };
+
+                    let msg = if balance_str.is_some() { "查询成功".to_string() } else { "未识别到余额字段".to_string() };
+                    Ok(BalanceResult {
+                        supported: true,
+                        balance: balance_str,
+                        message: msg,
+                    })
+                }
+                Err(_) => Ok(BalanceResult {
+                    supported: true,
+                    balance: None,
+                    message: "余额接口返回非JSON响应".into(),
+                }),
+            }
+        }
+        Err(e) => Ok(BalanceResult {
+            supported: true,
+            balance: None,
+            message: format!("查询失败: {}", e),
+        }),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -517,13 +677,21 @@ pub fn run() {
             show_main_window,
             quit_app,
             reset_request_count,
+            get_claude_config_status,
+            apply_claude_3p_config,
+            remove_claude_3p_config,
+            restart_claude_desktop,
+            get_localization_status,
+            apply_chinese_localization,
+            restore_chinese_localization,
+            query_provider_balance,
         ])
         .setup(|app| {
             let tray_icon = Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
                 .expect("tray-icon.png is valid PNG");
             let _tray = TrayIconBuilder::with_id(TRAY_ID)
                 .icon(tray_icon)
-                .tooltip("Codex CN Proxy")
+                .tooltip("cc-proxy")
                 .on_tray_icon_event(|tray, event| {
                     match event {
                         TrayIconEvent::Click {

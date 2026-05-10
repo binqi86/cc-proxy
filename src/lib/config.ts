@@ -7,7 +7,9 @@ export interface ProviderConfig {
   modelsPath: string;
   defaultModel: string;
   modelMap: Record<string, string>;
-  modelOptions?: Record<string, { systemMessageMode?: string; omitParams?: string[] }>;
+  claudeModelMap?: Record<string, string>;
+  reasoningMapping?: Record<string, string>;
+  normalizeChatRoles?: boolean;
 }
 
 export interface EnvConfig {
@@ -21,8 +23,11 @@ export interface EnvConfig {
   TARGET_MODELS_PATH?: string;
   DEFAULT_MODEL?: string;
   REQUEST_TIMEOUT_MS?: string;
-  LOG_UPSTREAM_REQUEST?: string;
   MODEL_MAP?: string;
+  CLAUDE_MODEL_MAP?: string;
+  REASONING_MAPPING?: string;
+  MAX_REQUEST_BODY_SIZE?: string;
+  NORMALIZE_CHAT_ROLES?: string;
 }
 
 export interface ServiceStatus {
@@ -63,4 +68,30 @@ export interface TestResult {
   error?: string;
 }
 
-export type NavItem = 'overview' | 'providers' | 'env' | 'status' | 'test';
+export type ActiveMode = 'codex' | 'claude';
+
+export type NavItem = 'dashboard' | 'providers' | 'proxy' | 'tools' | 'settings';
+
+export interface ClaudeConfigStatus {
+  applied: boolean;
+  config_file_exists: boolean;
+  deployment_mode: string;
+  gateway_url: string;
+  model_count: number;
+  claude_app_exists: boolean;
+  claude_version: string | null;
+}
+
+export interface LocalizationStatus {
+  is_patched: boolean;
+  has_backup: boolean;
+  claude_version: string | null;
+  is_claude_running: boolean;
+  error: string | null;
+}
+
+export interface ClaudeModelEntry {
+  name: string;
+  supports_1m?: boolean;
+  display_name?: string;
+}

@@ -6,6 +6,9 @@ import type {
   AppStats,
   TestConfig,
   TestResult,
+  ClaudeConfigStatus,
+  LocalizationStatus,
+  ClaudeModelEntry,
 } from './config';
 
 export const api = {
@@ -36,5 +39,25 @@ export const api = {
     showMain: () => invoke<void>('show_main_window'),
     quit: () => invoke<void>('quit_app'),
     resetCount: () => invoke<number>('reset_request_count'),
+  },
+
+  claude: {
+    getConfigStatus: () => invoke<ClaudeConfigStatus>('get_claude_config_status'),
+    apply3pConfig: (port: number, apiKey: string, models: ClaudeModelEntry[]) =>
+      invoke<string>('apply_claude_3p_config', { port, apiKey, models }),
+    remove3pConfig: () => invoke<void>('remove_claude_3p_config'),
+    restartDesktop: () => invoke<string>('restart_claude_desktop'),
+  },
+
+  localization: {
+    getStatus: () => invoke<LocalizationStatus>('get_localization_status'),
+    apply: (zhCnJson: string, desktopJson: string, statsigJson: string) =>
+      invoke<string>('apply_chinese_localization', { zhCnJson, desktopJson, statsigJson }),
+    restore: () => invoke<string>('restore_chinese_localization'),
+  },
+
+  provider: {
+    balance: (id: string, baseUrl: string, apiKey: string) =>
+      invoke<{ supported: boolean; balance: string | null; message: string }>('query_provider_balance', { providerId: id, baseUrl, apiKey }),
   },
 };
