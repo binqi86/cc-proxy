@@ -55,6 +55,8 @@ struct AppState {
     service_port: Mutex<Option<u16>>,
     proxy_logs: std::sync::Arc<Mutex<Vec<String>>>,
     request_count: std::sync::Arc<Mutex<u64>>,
+    tray_click_x: Mutex<Option<f64>>,
+    popup_height: Mutex<f64>,
 }
 
 fn read_configured_port() -> u16 {
@@ -62,14 +64,17 @@ fn read_configured_port() -> u16 {
     let env_path = format!("{}/.env", dir);
     if let Ok(env_map) = config::read_env(&env_path) {
         if let Some(port_str) = env_map.get("PORT") {
-            return port_str.parse::<u16>().unwrap_or(8787);
+            return port_str.parse::<u16>().unwrap_or(8088);
         }
     }
-    8787
+    8088
 }
 
 const TRAY_ID: &str = "proxy-tray";
 const POPUP_LABEL: &str = "popup";
+const POPUP_WIDTH: f64 = 340.0;
+const POPUP_MIN_HEIGHT: f64 = 120.0;
+const POPUP_MAX_HEIGHT: f64 = 800.0;
 
 fn config_dir() -> String {
     // 1. Search upward from cwd
@@ -174,11 +179,28 @@ fn sync_config_to_popup(app: &AppHandle, event: &str, data: &serde_json::Value) 
 // ── Popup window management ──
 
 fn get_popup_position(app: &AppHandle) -> (f64, f64) {
+    let state = app.state::<AppState>();
+    let tray_x = *state.tray_click_x.lock().unwrap();
+
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        let scale = monitor.scale_factor();
+
+        if let Some(click_x) = tray_x {
+            // Convert physical to logical
+            let logical_x = click_x / scale;
+            // Center the popup below the tray icon
+            let x = (logical_x - (POPUP_WIDTH / 2.0)).max(8.0);
+            let y = 30.0; // below menu bar
+            return (x, y);
+        }
+    }
+
+    // Fallback: right-aligned
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let size = monitor.size();
         let scale = monitor.scale_factor();
         let logical_width = size.width as f64 / scale;
-        let x = (logical_width - 340.0 - 16.0).max(0.0);
+        let x = (logical_width - POPUP_WIDTH - 16.0).max(0.0);
         return (x, 30.0);
     }
     (500.0, 30.0)
@@ -195,8 +217,8 @@ fn create_popup_window(app: &AppHandle) {
         tauri::WebviewUrl::App("index.html?window=popup".into()),
     )
     .title("cc-proxy")
-    .inner_size(340.0, 440.0)
-    .resizable(false)
+    .inner_size(POPUP_WIDTH, POPUP_MIN_HEIGHT)
+    .resizable(true)
     .decorations(false)
     .always_on_top(true)
     .skip_taskbar(true)
@@ -242,7 +264,9 @@ fn toggle_popup_window(app: &AppHandle) {
             let _ = popup.hide();
         } else {
             let (x, y) = get_popup_position(app);
+            let desired_height = *app.state::<AppState>().popup_height.lock().unwrap();
             let _ = popup.set_position(tauri::LogicalPosition::new(x, y));
+            let _ = popup.set_size(tauri::LogicalSize::new(POPUP_WIDTH, desired_height));
             let _ = popup.show();
             let _ = popup.set_focus();
             let state = app.state::<AppState>();
@@ -252,6 +276,16 @@ fn toggle_popup_window(app: &AppHandle) {
             sync_frontend(app, &status);
         }
     }
+}
+
+#[tauri::command]
+async fn resize_popup_window(app: AppHandle, height: f64) -> Result<(), String> {
+    let target = height.clamp(POPUP_MIN_HEIGHT, POPUP_MAX_HEIGHT);
+    *app.state::<AppState>().popup_height.lock().unwrap() = target;
+    if let Some(popup) = app.get_webview_window(POPUP_LABEL) {
+        let _ = popup.set_size(tauri::LogicalSize::new(POPUP_WIDTH, target));
+    }
+    Ok(())
 }
 
 // ── Tauri commands ──
@@ -662,6 +696,8 @@ pub fn run() {
             service_port: Mutex::new(None),
             proxy_logs: std::sync::Arc::new(Mutex::new(Vec::new())),
             request_count: std::sync::Arc::new(Mutex::new(0)),
+            tray_click_x: Mutex::new(None),
+            popup_height: Mutex::new(POPUP_MIN_HEIGHT),
         })
         .invoke_handler(tauri::generate_handler![
             start_service,
@@ -676,6 +712,7 @@ pub fn run() {
             test_connection,
             show_main_window,
             quit_app,
+            resize_popup_window,
             reset_request_count,
             get_claude_config_status,
             apply_claude_3p_config,
@@ -697,9 +734,12 @@ pub fn run() {
                         TrayIconEvent::Click {
                             button: MouseButton::Left,
                             button_state: MouseButtonState::Up,
+                            position,
                             ..
                         } => {
                             let app = tray.app_handle();
+                            // Store click position for popup alignment
+                            *app.state::<AppState>().tray_click_x.lock().unwrap() = Some(position.x);
                             toggle_popup_window(app);
                         }
                         TrayIconEvent::Click {

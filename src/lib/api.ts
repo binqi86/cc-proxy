@@ -38,6 +38,7 @@ export const api = {
   window: {
     showMain: () => invoke<void>('show_main_window'),
     quit: () => invoke<void>('quit_app'),
+    resizePopup: (height: number) => invoke<void>('resize_popup_window', { height }),
     resetCount: () => invoke<number>('reset_request_count'),
   },
 

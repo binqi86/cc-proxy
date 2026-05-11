@@ -19,9 +19,17 @@ pub fn start_proxy(config_path: &str) -> Result<ProxyProcess, String> {
 
     let port = detect_port_from_config(config_path);
 
-    let mut child = Command::new(&node_path)
-        .arg(&server_js)
-        .env("NODE_ENV", "production")
+    let mut cmd = Command::new(&node_path);
+    cmd.arg(&server_js).env("NODE_ENV", "production");
+
+    // Forward .env config to the Node.js process so it uses the configured port
+    if let Ok(env_map) = super::config::read_env(config_path) {
+        for (key, value) in &env_map {
+            cmd.env(key, value);
+        }
+    }
+
+    let mut child = cmd
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -174,7 +182,7 @@ fn detect_port_from_env_config() -> u16 {
         let env_path = format!("{}/.env", dir.display());
         if let Ok(env_map) = super::config::read_env(&env_path) {
             if let Some(port_str) = env_map.get("PORT") {
-                return port_str.parse::<u16>().unwrap_or(8787);
+                return port_str.parse::<u16>().unwrap_or(8088);
             }
         }
     }
@@ -183,18 +191,18 @@ fn detect_port_from_env_config() -> u16 {
         let env_path = format!("{}/.cc-proxy/.env", home);
         if let Ok(env_map) = super::config::read_env(&env_path) {
             if let Some(port_str) = env_map.get("PORT") {
-                return port_str.parse::<u16>().unwrap_or(8787);
+                return port_str.parse::<u16>().unwrap_or(8088);
             }
         }
     }
-    8787
+    8088
 }
 
 fn detect_port_from_config(config_path: &str) -> u16 {
     if let Ok(env_map) = super::config::read_env(config_path) {
         if let Some(port_str) = env_map.get("PORT") {
-            return port_str.parse::<u16>().unwrap_or(8787);
+            return port_str.parse::<u16>().unwrap_or(8088);
         }
     }
-    8787
+    8088
 }
