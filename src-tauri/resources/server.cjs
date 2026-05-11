@@ -10,7 +10,7 @@ loadDotEnv(path.join(__dirname, ".env"));
 const PROVIDER_PRESET = process.env.PROVIDER_PRESET || "";
 const PROVIDER_CONFIG_PATH = process.env.PROVIDER_CONFIG_PATH || path.join(__dirname, "providers.json");
 const PRESET_DEFAULTS = loadProviderPreset(PROVIDER_PRESET, PROVIDER_CONFIG_PATH);
-const PORT = Number(process.env.PORT || 8787);
+const PORT = Number(process.env.PORT || 8088);
 const HOST = process.env.HOST || "127.0.0.1";
 const TARGET_BASE_URL = stripTrailingSlash(
   requireConfig("TARGET_BASE_URL", process.env.TARGET_BASE_URL || PRESET_DEFAULTS.baseUrl)
