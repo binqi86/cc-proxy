@@ -30,7 +30,7 @@ cc-proxy 是面向 Claude Code / Codex CLI 的本地大模型代理工具。它�
 
 前往 [GitHub Releases](https://github.com/chenyubinqi/cc-proxy/releases) 下载最新版本：
 
-- `cc-proxy-v<version>-macOS-arm64.dmg`：macOS 拖拽安装包
+- `cc-proxy_<version>_aarch64.dmg`：macOS 拖拽安装包
 
 macOS 版本暂时没有 Apple 开发者签名，系统可能提示无法验证开发者。首次打开请在终端执行：
 
@@ -44,9 +44,9 @@ xattr -cr "/Applications/cc-proxy.app"
 2. 在「供应商」页面选择一个供应商预设，填入 API Key。
 3. 按需调整模型映射。
 4. 回到「仪表盘」点击供应商旁的开关，一键切换。
-5. 将 Claude Code / Codex 的 API endpoint 指向 `http://127.0.0.1:8787`。
+5. 将 Claude Code / Codex 的 API endpoint 指向 `http://127.0.0.1:8088`。
 
-默认代理端口：`8787`（可在设置中修改）。
+默认代理端口：`8088`（可在设置中修改）。
 
 ## 代理接口
 
@@ -126,7 +126,7 @@ npm run tauri build
 确认代理已启动（菜单栏图标为绿色），检查端口是否被占用：
 
 ```bash
-lsof -i :8787
+lsof -i :8088
 ```
 
 ### 关闭窗口后代理还在运行吗
