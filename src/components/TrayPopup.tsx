@@ -26,6 +26,7 @@ export default function TrayPopup() {
   const [theme, setTheme] = useState(getStoredTheme());
   const [loading, setLoading] = useState(false);
   const [bodyScrollable, setBodyScrollable] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const isDark = theme === 'dark';
   const providerList = sortedProviders(providers);
@@ -43,6 +44,7 @@ export default function TrayPopup() {
         const body = bodyRef.current;
         const footer = footerRef.current;
         if (!card || !header || !body || !footer) return;
+        if (!ready) return;
 
         const chromeHeight = card.offsetHeight - (header.offsetHeight + body.clientHeight + footer.offsetHeight);
         const contentHeight = header.offsetHeight + body.scrollHeight + footer.offsetHeight + Math.max(chromeHeight, 0);
@@ -56,12 +58,12 @@ export default function TrayPopup() {
         }
       });
     });
-  }, []);
+  }, [ready]);
 
   // Auto-resize: grow with content first, scroll only after hitting max height.
   useEffect(() => {
     resizePopup();
-  }, [resizePopup, configuredProviders.length, activeProviderId, providers]);
+  }, [resizePopup, configuredProviders.length, activeProviderId, providers, ready]);
 
   // Recalculate when window becomes visible/focused to avoid stale hidden-size state.
   useEffect(() => {
@@ -89,6 +91,7 @@ export default function TrayPopup() {
 
   const loadState = useCallback(async () => {
     try { const [s, p, env] = await Promise.all([api.service.getStats(), api.providers.read(), api.env.read()]); setStats(s); setProviders(p); setActiveProviderId(env.PROVIDER_PRESET || ''); } catch { /* */ }
+    finally { setReady(true); }
   }, []);
 
   useEffect(() => { loadState(); const i = setInterval(async () => { try { setStats(await api.service.getStats()); } catch { /* */ } }, 3000); return () => clearInterval(i); }, [loadState]);
@@ -143,6 +146,11 @@ export default function TrayPopup() {
           border: `1px solid rgb(var(--border) / 0.6)`,
           boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
           maxHeight: `${POPUP_MAX_HEIGHT}px`,
+          // Hide the card until the first data load completes so users never see the
+          // empty/loading state flash before content settles. Layout still measures
+          // because we keep the card mounted (visibility:hidden), so the height
+          // reported back to Tauri is already the final one when it becomes visible.
+          visibility: ready ? 'visible' : 'hidden',
         }}
       >
       {/* Header — brand left, service+theme icon buttons right */}

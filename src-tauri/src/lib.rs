@@ -206,75 +206,112 @@ fn get_popup_position(app: &AppHandle) -> (f64, f64) {
     (500.0, 30.0)
 }
 
+// Raise the popup above regular floating windows. Space membership is handled by
+// Tauri's visible_on_all_workspaces API; keep this native patch narrowly scoped.
+#[cfg(target_os = "macos")]
+fn macos_raise_popup_level(window: &tauri::WebviewWindow) {
+    if let Ok(ns_window_ptr) = window.ns_window() {
+        if ns_window_ptr.is_null() { return; }
+        use objc::{msg_send, sel, sel_impl};
+        use objc::runtime::Object;
+        let ns_window = ns_window_ptr as *mut Object;
+        unsafe {
+            // NSPopUpMenuWindowLevel (101): above NSFloatingWindowLevel (3).
+            let _: () = msg_send![ns_window, setLevel: 101i64];
+        }
+    }
+}
+
 fn create_popup_window(app: &AppHandle) {
     if app.get_webview_window(POPUP_LABEL).is_some() {
         return;
     }
     let (x, y) = get_popup_position(app);
+    let desired_height = *app.state::<AppState>().popup_height.lock().unwrap();
     let popup = tauri::WebviewWindowBuilder::new(
         app,
         POPUP_LABEL,
         tauri::WebviewUrl::App("index.html?window=popup".into()),
     )
     .title("cc-proxy")
-    .inner_size(POPUP_WIDTH, POPUP_MIN_HEIGHT)
+    .inner_size(POPUP_WIDTH, desired_height)
+    // Set the final position at builder time so the NSWindow is born at the right
+    // location — set_position after creation causes a one-frame position flicker.
+    .position(x, y)
     .resizable(true)
     .decorations(false)
     .always_on_top(true)
+    .visible_on_all_workspaces(true)
     .skip_taskbar(true)
     .visible(false)
     .build();
 
     if let Ok(window) = popup {
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
         #[cfg(target_os = "macos")]
-        if let Ok(ns_window_ptr) = window.ns_window() {
-            if !ns_window_ptr.is_null() {
-                use objc::{msg_send, sel, sel_impl};
-                use objc::runtime::Object;
-                let ns_window = ns_window_ptr as *mut Object;
-                unsafe {
-                    if let Some(cls) = objc::runtime::Class::get("NSColor") {
-                        let clear_color: *mut Object = msg_send![cls, clearColor];
-                        let _: () = msg_send![ns_window, setBackgroundColor: clear_color];
+        {
+            let _ = window.set_visible_on_all_workspaces(true);
+            macos_raise_popup_level(&window);
+            if let Ok(ns_window_ptr) = window.ns_window() {
+                if !ns_window_ptr.is_null() {
+                    use objc::{msg_send, sel, sel_impl};
+                    use objc::runtime::Object;
+                    let ns_window = ns_window_ptr as *mut Object;
+                    unsafe {
+                        if let Some(cls) = objc::runtime::Class::get("NSColor") {
+                            let clear_color: *mut Object = msg_send![cls, clearColor];
+                            let _: () = msg_send![ns_window, setBackgroundColor: clear_color];
+                        }
+                        let _: () = msg_send![ns_window, setOpaque: false];
+                        let _: () = msg_send![ns_window, setHasShadow: false];
+                        let content_view: *mut Object = msg_send![ns_window, contentView];
+                        let _: () = msg_send![content_view, setWantsLayer: true];
+                        let layer: *mut Object = msg_send![content_view, layer];
+                        let _: () = msg_send![layer, setCornerRadius: 16.0f64];
+                        let _: () = msg_send![layer, setMasksToBounds: true];
                     }
-                    let _: () = msg_send![ns_window, setOpaque: false];
-                    let _: () = msg_send![ns_window, setHasShadow: false];
-                    let content_view: *mut Object = msg_send![ns_window, contentView];
-                    let _: () = msg_send![content_view, setWantsLayer: true];
-                    let layer: *mut Object = msg_send![content_view, layer];
-                    let _: () = msg_send![layer, setCornerRadius: 16.0f64];
-                    let _: () = msg_send![layer, setMasksToBounds: true];
                 }
             }
         }
         let app_handle = app.clone();
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::Focused(false) = event {
-                let _ = app_handle.get_webview_window(POPUP_LABEL).map(|w| w.hide());
+                if let Some(window) = app_handle.get_webview_window(POPUP_LABEL) {
+                    if window.is_visible().unwrap_or(false) {
+                        let _ = window.destroy();
+                    }
+                }
             }
         });
     }
 }
 
 fn toggle_popup_window(app: &AppHandle) {
-    create_popup_window(app);
     if let Some(popup) = app.get_webview_window(POPUP_LABEL) {
         if popup.is_visible().unwrap_or(false) {
-            let _ = popup.hide();
-        } else {
-            let (x, y) = get_popup_position(app);
-            let desired_height = *app.state::<AppState>().popup_height.lock().unwrap();
-            let _ = popup.set_position(tauri::LogicalPosition::new(x, y));
-            let _ = popup.set_size(tauri::LogicalSize::new(POPUP_WIDTH, desired_height));
-            let _ = popup.show();
-            let _ = popup.set_focus();
-            let state = app.state::<AppState>();
-            let pid = *state.service_pid.lock().unwrap();
-            let port = *state.service_port.lock().unwrap();
-            let status = ServiceStatus { running: pid.is_some(), pid, port };
-            sync_frontend(app, &status);
+            let _ = popup.destroy();
+            return;
         }
+        // Avoid reusing a hidden NSWindow from another Space.
+        let _ = popup.destroy();
+    }
+
+    create_popup_window(app);
+    if let Some(popup) = app.get_webview_window(POPUP_LABEL) {
+        #[cfg(target_os = "macos")]
+        {
+            let _ = popup.set_visible_on_all_workspaces(true);
+            macos_raise_popup_level(&popup);
+        }
+        let _ = popup.show();
+        let _ = popup.set_focus();
+        #[cfg(target_os = "macos")]
+        macos_raise_popup_level(&popup);
+
+        let state = app.state::<AppState>();
+        let pid = *state.service_pid.lock().unwrap();
+        let port = *state.service_port.lock().unwrap();
+        let status = ServiceStatus { running: pid.is_some(), pid, port };
+        sync_frontend(app, &status);
     }
 }
 
@@ -758,9 +795,6 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
-
-            // Pre-create popup (hidden, set up transparency)
-            create_popup_window(&app.handle().clone());
 
             // Hide main window after setup
             if let Some(window) = app.get_webview_window("main") {
