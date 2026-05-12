@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { getStoredTheme, toggleTheme } from '@/lib/theme';
+import { version as appVersion } from '../../package.json';
 
 const SaveIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>);
 const EyeIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>);
@@ -83,7 +84,7 @@ export default function SettingsPage() {
       {/* About */}
       <div className="settings-panel">
         <div className="px-5 py-4 border-b border-border/30"><h2 className="text-sm font-bold">关于</h2></div>
-        <div className="settings-row"><span className="settings-label">版本</span><span className="text-sm font-semibold">1.0.0</span></div>
+        <div className="settings-row"><span className="settings-label">版本</span><span className="text-sm font-semibold">{appVersion}</span></div>
         <div className="settings-row"><span className="settings-label">代理服务器</span><span className="text-sm font-mono">{service.running ? `Node.js :${service.port}` : '未运行'}</span></div>
         <div className="settings-row"><span className="settings-label">支持协议</span><span className="text-sm">OpenAI Responses / Chat Completions</span></div>
       </div>

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "sync-version": "node -e \"const pkg=require('./package.json');const tauri=require('./src-tauri/tauri.conf.json');tauri.version=pkg.version;require('fs').writeFileSync('./src-tauri/tauri.conf.json',JSON.stringify(tauri,null,2)+'\\\\n')\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
