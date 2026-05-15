@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import useAppStore from '@/store/appStore';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getStoredTheme, toggleTheme, applyTheme } from '@/lib/theme';
+import { ClaudeIcon, CodexIcon } from '@/components/BrandIcons';
+import ProviderIcon from '@/components/ProviderIcon';
 import type { ProviderConfig, AppStats } from '@/lib/config';
 
 const PROVIDER_ORDER = ['deepseek', 'dashscope', 'zhipu', 'moonshot', 'minimax', 'volcengine-coding'];
@@ -20,13 +23,17 @@ function sortedProviders(providers: Record<string, ProviderConfig>): [string, Pr
 }
 
 export default function TrayPopup() {
+  const store = useAppStore;
   const [stats, setStats] = useState<AppStats>({ running: false, pid: undefined, port: undefined, request_count: 0 });
   const [providers, setProviders] = useState<Record<string, ProviderConfig>>({});
-  const [activeProviderId, setActiveProviderId] = useState('');
+  // Local provider IDs — synced from backend, the single source of truth
+  const [codexId, setCodexId] = useState('');
+  const [claudeId, setClaudeId] = useState('');
   const [theme, setTheme] = useState(getStoredTheme());
   const [loading, setLoading] = useState(false);
   const [bodyScrollable, setBodyScrollable] = useState(false);
   const [ready, setReady] = useState(false);
+  const switching = useRef(false);
 
   const isDark = theme === 'dark';
   const providerList = sortedProviders(providers);
@@ -46,7 +53,8 @@ export default function TrayPopup() {
         if (!card || !header || !body || !footer) return;
         if (!ready) return;
 
-        const chromeHeight = card.offsetHeight - (header.offsetHeight + body.clientHeight + footer.offsetHeight);
+        const measuredParts = header.offsetHeight + body.clientHeight + footer.offsetHeight;
+        const chromeHeight = card.offsetHeight - measuredParts;
         const contentHeight = header.offsetHeight + body.scrollHeight + footer.offsetHeight + Math.max(chromeHeight, 0);
 
         if (contentHeight > 0) {
@@ -60,12 +68,7 @@ export default function TrayPopup() {
     });
   }, [ready]);
 
-  // Auto-resize: grow with content first, scroll only after hitting max height.
-  useEffect(() => {
-    resizePopup();
-  }, [resizePopup, configuredProviders.length, activeProviderId, providers, ready]);
-
-  // Recalculate when window becomes visible/focused to avoid stale hidden-size state.
+  useEffect(() => { resizePopup(); }, [resizePopup, configuredProviders.length, codexId, claudeId, providers, ready]);
   useEffect(() => {
     const handleVisibleResize = () => resizePopup();
     window.addEventListener('focus', handleVisibleResize);
@@ -79,22 +82,40 @@ export default function TrayPopup() {
       window.clearTimeout(timer);
     };
   }, [resizePopup]);
-
-  // Watch element size changes (fonts/content/layout) and keep popup height in sync.
   useEffect(() => {
     if (!cardRef.current || !bodyRef.current) return;
     const observer = new ResizeObserver(() => resizePopup());
     observer.observe(cardRef.current);
     observer.observe(bodyRef.current);
     return () => observer.disconnect();
-  }, [configuredProviders.length, activeProviderId, providers]);
+  }, [configuredProviders.length, codexId, claudeId, providers]);
 
-  const loadState = useCallback(async () => {
-    try { const [s, p, env] = await Promise.all([api.service.getStats(), api.providers.read(), api.env.read()]); setStats(s); setProviders(p); setActiveProviderId(env.PROVIDER_PRESET || ''); } catch { /* */ }
-    finally { setReady(true); }
+  // ── Read current state from backend ──
+  const readEnvAndSync = useCallback(async () => {
+    try {
+      const env = await api.env.read();
+      const m = env as Record<string, string>;
+      setCodexId(m.CODEX_PROVIDER_PRESET || m.PROVIDER_PRESET || '');
+      setClaudeId(m.CLAUDE_PROVIDER_PRESET || '');
+    } catch { /* */ }
   }, []);
 
-  useEffect(() => { loadState(); const i = setInterval(async () => { try { setStats(await api.service.getStats()); } catch { /* */ } }, 3000); return () => clearInterval(i); }, [loadState]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const [s, p] = await Promise.all([api.service.getStats(), api.providers.read()]);
+        setStats(s); setProviders(p);
+      } catch { /* */ }
+      await readEnvAndSync();
+      setReady(true);
+    })();
+  }, [readEnvAndSync]);
+
+  useEffect(() => {
+    const i = setInterval(async () => { try { setStats(await api.service.getStats()); } catch { /* */ } }, 3000);
+    return () => clearInterval(i);
+  }, []);
+
   useEffect(() => {
     const s = (e: Event) => { const d = (e as CustomEvent).detail; if (d) setStats(p => ({ ...p, running: d.running, pid: d.pid, port: d.port })); };
     document.addEventListener('sync-service-status', s); return () => document.removeEventListener('sync-service-status', s);
@@ -104,9 +125,14 @@ export default function TrayPopup() {
     document.addEventListener('providers-changed', s); return () => document.removeEventListener('providers-changed', s);
   }, []);
   useEffect(() => {
-    const s = (e: Event) => { const d = (e as CustomEvent).detail; if (d) setActiveProviderId(d.PROVIDER_PRESET || ''); };
-    document.addEventListener('env-changed', s); return () => document.removeEventListener('env-changed', s);
-  }, []);
+    const s = () => {
+      if (switching.current) return; // skip self-triggered events
+      readEnvAndSync();
+    };
+    document.addEventListener('env-changed', s);
+    return () => document.removeEventListener('env-changed', s);
+  }, [readEnvAndSync]);
+
   useEffect(() => {
     const check = () => { const t = getStoredTheme(); setTheme(p => p !== t ? t : p); applyTheme(t); };
     const i = setInterval(check, 1000); window.addEventListener('focus', check);
@@ -120,18 +146,43 @@ export default function TrayPopup() {
       else { const s = await api.service.start(); setStats(p => ({ ...p, running: true, pid: s.pid, port: s.port })); }
     } catch { /* */ } setLoading(false);
   };
-  const handleToggleProvider = async (id: string) => {
-    if (id === activeProviderId || loading) return; setLoading(true);
+
+  const handleSwitch = async (id: string, mode: 'codex' | 'claude') => {
+    const currentId = mode === 'codex' ? codexId : claudeId;
+    if (id === currentId || loading) return;
+    const provider = providers[id];
+    if (!provider) return;
+    setLoading(true);
+    switching.current = true;
+
     try {
-      const p = providers[id]; if (!p) return;
-      const env = await api.env.read(); env.PROVIDER_PRESET = id; env.TARGET_API_KEY = p.apiKey || env.TARGET_API_KEY || '';
-      await api.env.write(env); setActiveProviderId(id);
-      const { running, pid } = stats;
-      if (running && pid) { try { await api.service.stop(pid); } catch { /* */ }
+      const apiKey = mode === 'codex'
+        ? (provider.codexApiKey || provider.apiKey || '')
+        : (provider.claudeApiKey || provider.apiKey || '');
+
+      const env = await api.env.read();
+      const m = env as Record<string, string>;
+      m[`${mode.toUpperCase()}_PROVIDER_PRESET`] = id;
+      m[`${mode.toUpperCase()}_TARGET_API_KEY`] = apiKey;
+      if (mode === 'codex') {
+        m.PROVIDER_PRESET = id;
+        m.TARGET_API_KEY = apiKey;
+      }
+
+      await api.env.write(m);
+
+      if (mode === 'codex') setCodexId(id);
+      else setClaudeId(id);
+
+      if (stats.running && stats.pid) {
+        try { await api.service.stop(stats.pid); } catch { /* */ }
         try { const s = await api.service.start(); setStats(p => ({ ...p, running: true, pid: s.pid, port: s.port })); } catch { setStats(p => ({ ...p, running: false })); }
       }
-    } catch { /* */ } setLoading(false);
+    } catch { /* */ }
+    setLoading(false);
+    switching.current = false;
   };
+
   const handleTheme = () => setTheme(toggleTheme());
   const handleOpen = async () => { await api.window.showMain(); };
   const handleQuit = async () => { await api.window.quit(); };
@@ -146,15 +197,11 @@ export default function TrayPopup() {
           border: `1px solid rgb(var(--border) / 0.6)`,
           boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
           maxHeight: `${POPUP_MAX_HEIGHT}px`,
-          // Hide the card until the first data load completes so users never see the
-          // empty/loading state flash before content settles. Layout still measures
-          // because we keep the card mounted (visibility:hidden), so the height
-          // reported back to Tauri is already the final one when it becomes visible.
           visibility: ready ? 'visible' : 'hidden',
         }}
       >
-      {/* Header — brand left, service+theme icon buttons right */}
-      <div ref={headerRef} className="flex items-center gap-3 px-4 py-2.5 shrink-0 border-b border-border/30">
+      {/* Header */}
+      <div ref={headerRef} className="flex items-center gap-3 px-4 py-2 shrink-0 border-b border-border/30">
         <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
           {stats.running && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
           <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${stats.running ? 'bg-emerald-400' : 'bg-slate-500'}`} />
@@ -163,7 +210,6 @@ export default function TrayPopup() {
           <h1 className="text-[14px] font-extrabold leading-tight" style={{ color: 'rgb(var(--primary))' }}>cc-proxy</h1>
           <p className="text-[11px] text-muted-foreground leading-tight">{stats.running ? <>端口 {stats.port ?? '—'} · {stats.request_count} 次</> : '已停止'}</p>
         </div>
-        {/* Icon buttons like main window */}
         <button onClick={handleToggleService} className={cn(
           'grid place-items-center w-7 h-7 rounded-lg border transition-all duration-150',
           stats.running ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-muted text-muted-foreground border-border hover:text-foreground'
@@ -176,30 +222,38 @@ export default function TrayPopup() {
       {/* Body */}
       <div
         ref={bodyRef}
-        className={cn(
-          'px-4 py-3 space-y-3',
-          bodyScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-visible'
-        )}
+        className={cn('px-4 py-2 space-y-2', bodyScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-visible')}
         style={bodyScrollable ? { maxHeight: `${POPUP_MAX_HEIGHT - 120}px` } : undefined}
       >
         {configuredProviders.length > 0 && (
           <>
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">供应商</span>
             <div className="space-y-0.5">
-              {configuredProviders.map(([id, p]) => (
-                <div key={id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-muted/30 transition-colors">
-                  <span className="text-[12px] truncate flex-1 mr-2">{p.name || id}</span>
-                  <button onClick={() => handleToggleProvider(id)} disabled={id === activeProviderId || loading}
-                    className={cn('relative w-8 h-4 rounded-full transition-colors duration-200', id === activeProviderId ? 'bg-emerald-500 cursor-default' : 'bg-muted-foreground/30 hover:bg-primary/40')}>
-                    <span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200', id === activeProviderId ? 'left-4' : 'left-0.5')} />
-                  </button>
-                </div>
-              ))}
+              {configuredProviders.map(([id, p]) => {
+                const isCodex = id === codexId;
+                const isClaude = id === claudeId;
+                return (
+                  <div key={id} className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-muted/30 transition-colors">
+                    <ProviderIcon id={id} name={p.name} size="sm" />
+                    <span className={cn('text-[12px] truncate flex-1', (isCodex || isClaude) && 'font-bold')}>{p.name || id}</span>
+                    <button onClick={() => handleSwitch(id, 'codex')} disabled={isCodex || loading}
+                      className={cn('p-0.5 rounded transition-all duration-150', isCodex ? 'cursor-default' : 'cursor-pointer')}
+                      title={isCodex ? 'Codex 当前' : '设为 Codex'}>
+                      <CodexIcon size={14} dimmed={!isCodex} />
+                    </button>
+                    <button onClick={() => handleSwitch(id, 'claude')} disabled={isClaude || loading}
+                      className={cn('p-0.5 rounded transition-all duration-150', isClaude ? 'cursor-default' : 'cursor-pointer')}
+                      title={isClaude ? 'Claude 当前' : '设为 Claude'}>
+                      <ClaudeIcon size={14} dimmed={!isClaude} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
         {configuredProviders.length === 0 && (
-          <p className="text-[12px] text-muted-foreground py-3 text-center">暂无已配置的供应商</p>
+          <p className="text-[12px] text-muted-foreground py-2 text-center">暂无已配置的供应商</p>
         )}
       </div>
 

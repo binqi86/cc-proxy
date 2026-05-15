@@ -2,6 +2,7 @@
 mod config;
 mod process;
 mod claude_config;
+mod codex_config;
 mod localization;
 
 use std::sync::Mutex;
@@ -119,8 +120,13 @@ fn copy_bundled_resources_to(dest: &std::path::Path) {
                 for file in &["providers.json", "server.cjs"] {
                     let src_file = src.join(file);
                     let dest_file = dest.join(file);
-                    if src_file.exists() && !dest_file.exists() {
-                        let _ = std::fs::copy(&src_file, &dest_file);
+                    if src_file.exists() {
+                        // Always overwrite server.cjs to keep it in sync with the build
+                        // Only create providers.json if it doesn't exist (preserve user config)
+                        let is_server = file.ends_with("server.cjs");
+                        if is_server || !dest_file.exists() {
+                            let _ = std::fs::copy(&src_file, &dest_file);
+                        }
                     }
                 }
             }
@@ -166,14 +172,18 @@ fn sync_frontend(app: &AppHandle, status: &ServiceStatus) {
     }
 }
 
-fn sync_config_to_popup(app: &AppHandle, event: &str, data: &serde_json::Value) {
-    if let Some(window) = app.get_webview_window("popup") {
+fn sync_to_window(app: &AppHandle, label: &str, event: &str, data: &serde_json::Value) {
+    if let Some(window) = app.get_webview_window(label) {
         let json = serde_json::to_string(data).unwrap_or_default();
         let _ = window.eval(&format!(
             "document.dispatchEvent(new CustomEvent('{}',{{detail:{}}}))",
             event, json
         ));
     }
+}
+
+fn sync_config_to_popup(app: &AppHandle, event: &str, data: &serde_json::Value) {
+    sync_to_window(app, "popup", event, data);
 }
 
 // ── Popup window management ──
@@ -356,12 +366,10 @@ async fn start_service(
         let req_count = state.request_count.clone();
         std::thread::spawn(move || {
             for line in rx {
-                if let Some(rest) = line.strip_prefix("[PROXY_LOG]") {
-                    // Count upstream requests (lines starting with →)
-                    if rest.trim_start().starts_with('→') {
-                        let count = *req_count.lock().unwrap() + 1;
-                        *req_count.lock().unwrap() = count;
-                    }
+                // Count upstream requests (new format: "HH:MM:SS INFO → model ...")
+                if line.contains('→') {
+                    let count = *req_count.lock().unwrap() + 1;
+                    *req_count.lock().unwrap() = count;
                 }
                 logs.lock().unwrap().push(line);
             }
@@ -502,9 +510,10 @@ async fn write_env(
     let dir = config_dir();
     let env_path = format!("{}/.env", dir);
     config::write_env(&env_path, &env)?;
-    // Notify popup window to reload env
+    // Notify ALL windows so main ↔ popup stay in sync
     let env_json = serde_json::to_value(&env).unwrap_or_default();
-    sync_config_to_popup(&app, "env-changed", &env_json);
+    sync_to_window(&app, "main", "env-changed", &env_json);
+    sync_to_window(&app, "popup", "env-changed", &env_json);
     Ok(true)
 }
 
@@ -554,6 +563,29 @@ async fn reset_request_count(state: tauri::State<'_, AppState>) -> Result<u64, S
     let old = *count;
     *count = 0;
     Ok(old)
+}
+
+// ── Codex config commands ──
+
+#[tauri::command]
+async fn get_codex_config_status() -> Result<codex_config::CodexConfigStatus, String> {
+    let port = read_configured_port();
+    let gateway_url = format!("http://127.0.0.1:{}", port);
+    Ok(codex_config::get_codex_config_status(&gateway_url))
+}
+
+#[tauri::command]
+async fn apply_codex_config(
+    port: u16,
+    api_key: String,
+    default_model: String,
+) -> Result<codex_config::CodexApplyResult, String> {
+    codex_config::apply_codex_config(port, &api_key, &default_model)
+}
+
+#[tauri::command]
+async fn remove_codex_config() -> Result<(), String> {
+    codex_config::remove_codex_config()
 }
 
 // ── Claude Desktop 3P config commands ──
@@ -755,6 +787,9 @@ pub fn run() {
             apply_claude_3p_config,
             remove_claude_3p_config,
             restart_claude_desktop,
+            get_codex_config_status,
+            apply_codex_config,
+            remove_codex_config,
             get_localization_status,
             apply_chinese_localization,
             restore_chinese_localization,

@@ -7,6 +7,7 @@ import type {
   TestConfig,
   TestResult,
   ClaudeConfigStatus,
+  CodexConfigStatus,
   LocalizationStatus,
   ClaudeModelEntry,
 } from './config';
@@ -48,6 +49,13 @@ export const api = {
       invoke<string>('apply_claude_3p_config', { port, apiKey, models }),
     remove3pConfig: () => invoke<void>('remove_claude_3p_config'),
     restartDesktop: () => invoke<string>('restart_claude_desktop'),
+  },
+
+  codex: {
+    getConfigStatus: () => invoke<CodexConfigStatus>('get_codex_config_status'),
+    applyConfig: (port: number, apiKey: string, defaultModel: string) =>
+      invoke<{codex_config_written: boolean; cc_switch_config_written: boolean; gateway_url: string; model_count: number}>('apply_codex_config', { port, apiKey, defaultModel }),
+    removeConfig: () => invoke<void>('remove_codex_config'),
   },
 
   localization: {

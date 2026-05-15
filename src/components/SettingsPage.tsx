@@ -22,14 +22,28 @@ export default function SettingsPage() {
   const [theme, setTheme] = useState(getStoredTheme());
   const [saved, setSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [needsReapply, setNeedsReapply] = useState(false);
 
   useEffect(() => { setLocal({ ...(env as Record<string, string>) }); }, [env]);
 
   const handleSave = async () => {
+    const oldProxyKey = (env.PROXY_API_KEY || '').trim();
+    const newProxyKey = (local.PROXY_API_KEY || '').trim();
     useAppStore.getState().setEnv(local);
     await api.env.write(local);
     setSaved(true); setTimeout(() => setSaved(false), 2000);
     if (service.running && service.pid) { await stopService(); await startService(); }
+    if (oldProxyKey !== newProxyKey) {
+      setNeedsReapply(true);
+      useAppStore.getState().addLog({
+        id: `log-${Date.now()}`,
+        timestamp: new Date(),
+        level: 'warning',
+        message: '代理 API Key 已变更，请重新应用 Claude Desktop 和 Codex 配置',
+      });
+    } else {
+      setNeedsReapply(false);
+    }
   };
 
   const setF = (k: string, v: string) => setLocal(p => ({ ...p, [k]: v }));
@@ -80,6 +94,11 @@ export default function SettingsPage() {
         <Button size="sm" onClick={handleSave}><SaveIcon /> {saved ? '已保存' : '保存并重启服务'}</Button>
         {saved && <span className="text-xs text-emerald-400 font-semibold">✓ 配置已保存</span>}
       </div>
+      {needsReapply && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+          代理 API Key 已变更。请到首页重新点击“应用到桌面版”和“应用到 Codex”，否则客户端仍可能使用旧密钥导致 401。
+        </div>
+      )}
 
       {/* About */}
       <div className="settings-panel">

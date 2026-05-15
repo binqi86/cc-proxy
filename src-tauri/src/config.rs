@@ -60,6 +60,10 @@ pub fn write_env(path: &str, env: &std::collections::HashMap<String, String>) ->
         "HOST",
         "PORT",
         "PROXY_API_KEY",
+        "CODEX_PROVIDER_PRESET",
+        "CODEX_TARGET_API_KEY",
+        "CLAUDE_PROVIDER_PRESET",
+        "CLAUDE_TARGET_API_KEY",
         "PROVIDER_PRESET",
         "TARGET_API_KEY",
         "TARGET_BASE_URL",
@@ -68,6 +72,9 @@ pub fn write_env(path: &str, env: &std::collections::HashMap<String, String>) ->
         "DEFAULT_MODEL",
         "REQUEST_TIMEOUT_MS",
         "MODEL_MAP",
+        "CLAUDE_MODEL_MAP",
+        "REASONING_MAPPING",
+        "NORMALIZE_CHAT_ROLES",
         "MAX_REQUEST_BODY_SIZE",
     ];
 

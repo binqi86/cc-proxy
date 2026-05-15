@@ -58,10 +58,18 @@ export default function ProxyPage() {
           {!logs.length ? (
             <div className="text-slate-600 py-8 text-center">等待代理事件...</div>
           ) : (
-            logs.map((log) => (
+            logs.filter(log => log.source === 'codex' || log.source === 'claude').map((log) => (
               <div key={log.id} className="flex gap-3 py-0.5">
                 <span className={cn('text-[11px] flex-shrink-0', log.level === 'success' ? 'text-emerald-400' : log.level === 'error' ? 'text-red-400' : log.level === 'warning' ? 'text-amber-400' : 'text-blue-400')}>
                   {log.timestamp.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+                <span className={cn(
+                  'flex-shrink-0 w-14 text-[10px] font-semibold',
+                  log.source === 'codex' ? 'text-blue-300'
+                    : log.source === 'claude' ? 'text-orange-300'
+                      : 'text-slate-500'
+                )}>
+                  {log.source ? log.source.toUpperCase() : 'SYSTEM'}
                 </span>
                 <span className={cn('flex-shrink-0 w-10 text-[11px]', log.level === 'success' ? 'text-emerald-500' : log.level === 'error' ? 'text-red-500' : log.level === 'warning' ? 'text-amber-500' : 'text-blue-500')}>
                   {log.level.toUpperCase()}

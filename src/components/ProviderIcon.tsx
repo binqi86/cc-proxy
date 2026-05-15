@@ -1,13 +1,18 @@
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import deepseekSvg from '@/assets/providers/deepseek.svg?url';
+import dashscopeSvg from '@/assets/providers/dashscope.svg?url';
+import zhipuSvg from '@/assets/providers/zhipu.svg?url';
+import moonshotSvg from '@/assets/providers/moonshot.svg?url';
+import minimaxSvg from '@/assets/providers/minimax.svg?url';
+import volcengineSvg from '@/assets/providers/volcengine-coding.svg?url';
 
 const PROVIDER_LOGOS: Record<string, string> = {
-  deepseek:            'https://www.deepseek.com/favicon.ico',
-  dashscope:           'https://dashscope.aliyun.com/favicon.ico',
-  zhipu:               'https://open.bigmodel.cn/favicon.ico',
-  moonshot:            'https://statics.moonshot.cn/kimi-web-seo/assets/kimi-logo-CegIMkbU.png',
-  minimax:             'https://www.minimaxi.com/favicon.ico',
-  'volcengine-coding': 'https://lf3-static.bytednsdoc.com/obj/eden-cn/shayvw_lmjsvc/ljhwZthlaukjlkulzlp/logo-theme-light.svg',
+  deepseek: deepseekSvg,
+  dashscope: dashscopeSvg,
+  zhipu: zhipuSvg,
+  moonshot: moonshotSvg,
+  minimax: minimaxSvg,
+  'volcengine-coding': volcengineSvg,
 };
 
 function FallbackIcon({ name }: { name?: string }) {
@@ -22,7 +27,6 @@ function FallbackIcon({ name }: { name?: string }) {
 }
 
 export default function ProviderIcon({ id, name, size }: { id: string; name?: string; size?: 'sm' | 'md' | 'lg' }) {
-  const [imgFailed, setImgFailed] = useState(false);
   const logoUrl = PROVIDER_LOGOS[id];
   const dims = size === 'lg' ? 'w-12 h-12' : size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
   const inner = size === 'lg' ? 'w-8 h-8' : size === 'sm' ? 'w-5 h-5' : 'w-6 h-6';
@@ -30,13 +34,8 @@ export default function ProviderIcon({ id, name, size }: { id: string; name?: st
   return (
     <span className={cn('grid place-items-center rounded-xl flex-shrink-0 bg-white dark:bg-white/90', dims)}>
       <span className={cn('block', inner)}>
-        {logoUrl && !imgFailed ? (
-          <img
-            src={logoUrl}
-            alt={name || id}
-            className="w-full h-full object-contain"
-            onError={() => setImgFailed(true)}
-          />
+        {logoUrl ? (
+          <img src={logoUrl} alt={name || id} className="w-full h-full object-contain" />
         ) : (
           <FallbackIcon name={name || id} />
         )}

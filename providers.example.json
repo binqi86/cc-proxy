@@ -1,8 +1,12 @@
 {
   "dashscope": {
     "apiKey": "",
-    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
-    "chatPath": "/v1/chat/completions",
+    "codexBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
+    "codexChatPath": "/v1/chat/completions",
+    "codexModelsPath": "/v1/models",
+    "claudeBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
+    "claudeChatPath": "/v1/chat/completions",
+    "claudeModelsPath": "/v1/models",
     "defaultModel": "qwen-plus",
     "id": "dashscope",
     "modelMap": {
@@ -11,13 +15,16 @@
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
-    "modelsPath": "/v1/models",
     "name": "阿里云百炼"
   },
   "deepseek": {
     "apiKey": "",
-    "baseUrl": "https://api.deepseek.com",
-    "chatPath": "/v1/chat/completions",
+    "codexBaseUrl": "https://api.deepseek.com",
+    "codexChatPath": "/v1/chat/completions",
+    "codexModelsPath": "/v1/models",
+    "claudeBaseUrl": "https://api.deepseek.com/anthropic",
+    "claudeChatPath": "/v1/messages",
+    "claudeModelsPath": "/v1/models",
     "defaultModel": "deepseek-chat",
     "id": "deepseek",
     "modelMap": {
@@ -26,13 +33,16 @@
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
-    "modelsPath": "/v1/models",
     "name": "Deepseek"
   },
   "minimax": {
     "apiKey": "",
-    "baseUrl": "https://api.minimax.io",
-    "chatPath": "/v1/chat/completions",
+    "codexBaseUrl": "https://api.minimax.io",
+    "codexChatPath": "/v1/chat/completions",
+    "codexModelsPath": "/v1/models",
+    "claudeBaseUrl": "https://api.minimax.io",
+    "claudeChatPath": "/v1/chat/completions",
+    "claudeModelsPath": "/v1/models",
     "defaultModel": "MiniMax-M2.5",
     "id": "minimax",
     "modelMap": {
@@ -41,13 +51,16 @@
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
-    "modelsPath": "/v1/models",
     "name": "Minimax"
   },
   "moonshot": {
     "apiKey": "",
-    "baseUrl": "https://api.moonshot.cn",
-    "chatPath": "/v1/chat/completions",
+    "codexBaseUrl": "https://api.moonshot.cn",
+    "codexChatPath": "/v1/chat/completions",
+    "codexModelsPath": "/v1/models",
+    "claudeBaseUrl": "https://api.moonshot.cn",
+    "claudeChatPath": "/v1/chat/completions",
+    "claudeModelsPath": "/v1/models",
     "defaultModel": "moonshot-v1-8k",
     "id": "moonshot",
     "modelMap": {
@@ -56,13 +69,16 @@
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
-    "modelsPath": "/v1/models",
     "name": "Moonshot"
   },
   "volcengine-coding": {
     "apiKey": "",
-    "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "chatPath": "/chat/completions",
+    "codexBaseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "codexChatPath": "/chat/completions",
+    "codexModelsPath": "/models",
+    "claudeBaseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "claudeChatPath": "/chat/completions",
+    "claudeModelsPath": "/models",
     "defaultModel": "ark-code-latest",
     "id": "volcengine-coding",
     "modelMap": {
@@ -76,13 +92,16 @@
         "systemMessageMode": "merge"
       }
     },
-    "modelsPath": "/models",
     "name": "火山方舟 coding plan"
   },
   "zhipu": {
     "apiKey": "",
-    "baseUrl": "https://open.bigmodel.cn/api/paas",
-    "chatPath": "/v4/chat/completions",
+    "codexBaseUrl": "https://open.bigmodel.cn/api/paas",
+    "codexChatPath": "/v4/chat/completions",
+    "codexModelsPath": "/v4/models",
+    "claudeBaseUrl": "https://open.bigmodel.cn/api/paas",
+    "claudeChatPath": "/v4/chat/completions",
+    "claudeModelsPath": "/v4/models",
     "defaultModel": "glm-4-plus",
     "id": "zhipu",
     "modelMap": {
@@ -91,7 +110,6 @@
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
-    "modelsPath": "/v4/models",
     "name": "智谱"
   }
 }

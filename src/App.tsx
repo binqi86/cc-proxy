@@ -21,6 +21,38 @@ const SunIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="non
 const PlayIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 3"/></svg>);
 const StopIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>);
 
+function isNoiseLogLine(line: string): boolean {
+  if (!line.trim()) return true;
+  if (/^---\s*$/.test(line)) return true;
+  if (/^(Wall time|Process exited|Original token count|Output):/i.test(line)) return true;
+  if (/^\d+\.\d+\.\d+/.test(line.trim()) && line.trim().length < 20) return true;
+  // Lines that are purely [N msgs/tools] dumps (no proxy content)
+  if (/^(\d{2}:\d{2}:\d{2}\s+)?\w+\s+\[\d+\s*(msgs|tools)/.test(line)
+      && !/转发请求|请求:|响应:|模型映射:|proxy/i.test(line)) return true;
+  // Lines that are purely system prompt dumps (| user:/assistant:/system:)
+  if (/\|\s*(user|assistant|system):/.test(line)
+      && !/转发请求|请求:|响应:|模型映射:|proxy/i.test(line)) return true;
+  if (/<system-reminder>/.test(line)) return true;
+  if (/config\.toml/.test(line)) return true;
+  // Hide raw message content dumps (long JSON payloads in log lines)
+  if (line.includes('"type":"text"') && line.includes('"text":"')) return true;
+  return false;
+}
+
+/** Truncate "转发请求 → model stream" at "stream" and strip [N msgs/tools] suffix. */
+function sanitizeProxyMessage(msg: string): string {
+  // "转发请求 → deepseek-v4-flash stream [extra garbage]" → truncate at " stream"
+  const streamIdx = msg.indexOf(' stream');
+  if (streamIdx !== -1 && msg.startsWith('转发请求 →')) {
+    const end = streamIdx + ' stream'.length;
+    if (msg.length > end + 1) return msg.slice(0, end);
+  }
+  // Strip trailing [N msgs, N tools] | user: noise from other messages
+  const noiseIdx = msg.search(/\[\d+\s*(msgs|tools)/);
+  if (noiseIdx > 0) return msg.slice(0, noiseIdx).trimEnd();
+  return msg;
+}
+
 const routeTabs: { id: NavItem; label: string; Icon: React.FC }[] = [
   { id: 'dashboard', label: '仪表盘', Icon: SpeedIcon },
   { id: 'providers', label: '供应商', Icon: PlugIcon },
@@ -45,16 +77,52 @@ export default function App() {
         if (!lines.length) return;
         const store = useAppStore.getState();
         for (const line of lines) {
-          if (line.startsWith('[PROXY_LOG]')) {
-            const msg = line.slice(12); // after "[PROXY_LOG] "
+          if (isNoiseLogLine(line)) continue;
+          // Parse new format: "HH:MM:SS LEVEL message"
+          const m = line.match(/^(\d{2}:\d{2}:\d{2}) (\w+) (.+)/);
+          if (m) {
+            const msg = m[3];
+            const rawLevel = m[2].toLowerCase();
+            const level = rawLevel === 'error' ? 'error'
+              : rawLevel === 'warn' ? 'warning'
+              : rawLevel === 'success' ? 'success'
+              : msg.startsWith('✗') ? 'error'
+              : msg.startsWith('← 4') || msg.startsWith('← 5') ? 'error'
+              : msg.startsWith('← 2') ? 'success'
+              : 'info';
+            const sourceMatch = msg.match(/^\[(CODEX|CLAUDE|SYSTEM)\]\s*/);
+            const source = sourceMatch
+              ? (sourceMatch[1].toLowerCase() as 'codex' | 'claude' | 'system')
+              : undefined;
+            let cleanedMessage = msg.replace(/^\[(CODEX|CLAUDE|SYSTEM)\]\s*/, '');
+            cleanedMessage = sanitizeProxyMessage(cleanedMessage);
+            // Truncate very long messages (raw content dumps)
+            const displayMessage = cleanedMessage.length > 300
+              ? cleanedMessage.slice(0, 300) + '...'
+              : cleanedMessage;
+            // Extract latency from response lines: "← 200 | 1493ms"
+            let latency: number | undefined;
+            const lm = cleanedMessage.match(/\|\s*(\d+)ms/);
+            if (lm) latency = parseInt(lm[1], 10);
+            store.addLog({
+              id: `plog-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,
+              timestamp: new Date(),
+              level,
+              source,
+              message: displayMessage,
+              latency,
+            });
+          }
+          // Fallback: old [PROXY_LOG] format
+          else if (line.startsWith('[PROXY_LOG]')) {
+            const msg = line.slice(12);
             const level = msg.startsWith('✗') ? 'error'
               : msg.startsWith('← 4') || msg.startsWith('← 5') ? 'error'
               : msg.startsWith('← 2') ? 'success'
               : 'info';
-            // Extract latency from response lines: "← 200 | 1493ms"
             let latency: number | undefined;
-            const m = msg.match(/\|\s*(\d+)ms/);
-            if (m) latency = parseInt(m[1], 10);
+            const lm = msg.match(/\|\s*(\d+)ms/);
+            if (lm) latency = parseInt(lm[1], 10);
             store.addLog({
               id: `plog-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,
               timestamp: new Date(),
@@ -63,13 +131,39 @@ export default function App() {
               latency,
             });
           }
+          // Keep unmatched lines visible instead of dropping them
+          else {
+            store.addLog({
+              id: `plog-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,
+              timestamp: new Date(),
+              level: 'info',
+              source: 'system',
+              message: line,
+            });
+          }
         }
       } catch { /* */ }
     }, 500);
 
     const onSync = (e: Event) => { const d = (e as CustomEvent).detail; if (d) setServiceStatus(d); };
     document.addEventListener('sync-service-status', onSync);
-    return () => { clearInterval(pollI); clearInterval(themeI); u1.then(fn => fn?.()); document.removeEventListener('sync-service-status', onSync); };
+
+    // Poll env to catch provider changes from popup
+    const pollEnv = async () => {
+      try {
+        const env = await api.env.read();
+        const m = env as Record<string, string>;
+        const store = useAppStore.getState();
+        const cId = m.CODEX_PROVIDER_PRESET || m.PROVIDER_PRESET || '';
+        const lId = m.CLAUDE_PROVIDER_PRESET || '';
+        if (cId !== store.codexProviderId || lId !== store.claudeProviderId) {
+          store.syncProviderIds(cId, lId);
+        }
+      } catch { /* */ }
+    };
+    const pollEnvI = setInterval(pollEnv, 2000);
+
+    return () => { clearInterval(pollI); clearInterval(themeI); clearInterval(pollEnvI); u1.then(fn => fn?.()); document.removeEventListener('sync-service-status', onSync); };
   }, []);
 
   const handleTheme = () => setTheme(toggleTheme());
