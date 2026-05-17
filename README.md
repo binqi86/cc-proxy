@@ -9,7 +9,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/main-window.png" alt="主界面" width="700">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/main-window.png">
+    <img src="docs/main-window.png" alt="主界面" width="700">
+  </picture>
   <br>
   <em>主界面 — 仪表盘、供应商管理、请求监控</em>
 </p>
