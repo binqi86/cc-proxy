@@ -5,13 +5,15 @@
     "codexChatPath": "/v1/chat/completions",
     "codexModelsPath": "/v1/models",
     "claudeBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
-    "claudeChatPath": "/v1/chat/completions",
+    "claudeChatPath": "/v1/messages",
     "claudeModelsPath": "/v1/models",
     "defaultModel": "qwen-plus",
     "id": "dashscope",
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
       "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5.4": "$DEFAULT_MODEL",
+      "gpt-5.5": "$DEFAULT_MODEL",
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
@@ -30,6 +32,8 @@
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
       "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5.4": "$DEFAULT_MODEL",
+      "gpt-5.5": "$DEFAULT_MODEL",
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
@@ -41,13 +45,15 @@
     "codexChatPath": "/v1/chat/completions",
     "codexModelsPath": "/v1/models",
     "claudeBaseUrl": "https://api.minimax.io",
-    "claudeChatPath": "/v1/chat/completions",
+    "claudeChatPath": "/v1/messages",
     "claudeModelsPath": "/v1/models",
     "defaultModel": "MiniMax-M2.5",
     "id": "minimax",
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
       "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5.4": "$DEFAULT_MODEL",
+      "gpt-5.5": "$DEFAULT_MODEL",
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
@@ -59,13 +65,15 @@
     "codexChatPath": "/v1/chat/completions",
     "codexModelsPath": "/v1/models",
     "claudeBaseUrl": "https://api.moonshot.cn",
-    "claudeChatPath": "/v1/chat/completions",
+    "claudeChatPath": "/v1/messages",
     "claudeModelsPath": "/v1/models",
     "defaultModel": "moonshot-v1-8k",
     "id": "moonshot",
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
       "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5.4": "$DEFAULT_MODEL",
+      "gpt-5.5": "$DEFAULT_MODEL",
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
@@ -77,13 +85,15 @@
     "codexChatPath": "/chat/completions",
     "codexModelsPath": "/models",
     "claudeBaseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "claudeChatPath": "/chat/completions",
+    "claudeChatPath": "/v1/messages",
     "claudeModelsPath": "/models",
     "defaultModel": "ark-code-latest",
     "id": "volcengine-coding",
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
       "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5.4": "$DEFAULT_MODEL",
+      "gpt-5.5": "$DEFAULT_MODEL",
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
@@ -100,13 +110,15 @@
     "codexChatPath": "/v4/chat/completions",
     "codexModelsPath": "/v4/models",
     "claudeBaseUrl": "https://open.bigmodel.cn/api/paas",
-    "claudeChatPath": "/v4/chat/completions",
+    "claudeChatPath": "/v1/messages",
     "claudeModelsPath": "/v4/models",
     "defaultModel": "glm-4-plus",
     "id": "zhipu",
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
       "gpt-5": "$DEFAULT_MODEL",
+      "gpt-5.4": "$DEFAULT_MODEL",
+      "gpt-5.5": "$DEFAULT_MODEL",
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },

@@ -16,6 +16,7 @@ export interface ProviderConfig {
   claudeModel1mMap?: Record<string, boolean>;
   reasoningMapping?: Record<string, string>;
   normalizeChatRoles?: boolean;
+  codexContextWindow?: boolean;
 }
 
 export interface EnvConfig {
@@ -149,6 +150,8 @@ export interface CodexModelSlot {
 }
 
 export const CODEX_MODEL_SLOTS: CodexModelSlot[] = [
+  { key: 'gpt-5.5', label: 'GPT-5.5', icon: 'bi-rocket-takeoff' },
+  { key: 'gpt-5.4', label: 'GPT-5.4', icon: 'bi-stars' },
   { key: 'gpt-5', label: 'GPT-5', icon: 'bi-stars' },
   { key: 'gpt-5-codex', label: 'GPT-5 Codex', icon: 'bi-terminal' },
   { key: 'gpt-5-mini', label: 'GPT-5 Mini', icon: 'bi-lightning' },
@@ -159,4 +162,4 @@ export const CODEX_MODEL_SLOTS: CodexModelSlot[] = [
   { key: 'gpt-5.1-codex-max', label: 'GPT-5.1 Codex Max', icon: 'bi-rocket' },
 ];
 
-export const CODEX_DEFAULT_SLOTS = ['gpt-5', 'gpt-5-codex', 'gpt-5-mini', 'gpt-5.1-codex'];
+export const CODEX_DEFAULT_SLOTS = ['gpt-5.5', 'gpt-5.4', 'gpt-5', 'gpt-5-codex', 'gpt-5-mini', 'gpt-5.1-codex'];

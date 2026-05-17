@@ -7,16 +7,35 @@ pub struct ProxyProcess {
     pub log_rx: Option<std::sync::mpsc::Receiver<String>>,
 }
 
+fn resolve_server_js() -> std::path::PathBuf {
+    // Always resolve to ~/.cc-proxy/server.cjs so __dirname points at the
+    // config directory (.env, providers.json, debug_logs).
+    let home: std::path::PathBuf = match std::env::var("HOME") {
+        Ok(h) => h.into(),
+        Err(_) => return std::path::PathBuf::from("server.cjs"),
+    };
+    let dest = home.join(".cc-proxy").join("server.cjs");
+
+    // 1. Search upward from cwd for a project-root server.cjs — copy it
+    let mut dir = std::env::current_dir().ok();
+    while let Some(d) = dir {
+        let candidate = d.join("server.cjs");
+        if candidate.exists() {
+            let _ = std::fs::copy(&candidate, &dest);
+            return dest;
+        }
+        dir = d.parent().map(|p| p.to_path_buf());
+    }
+
+    // 2. No project copy found — keep the existing one (production path)
+    dest
+}
+
 pub fn start_proxy(config_path: &str) -> Result<ProxyProcess, String> {
     // Find node in PATH
     let node_path = find_node().unwrap_or_else(|| "node".to_string());
 
-    let server_path = std::path::Path::new(config_path);
-    let server_js = server_path
-        .parent()
-        .map(|p| p.join("server.cjs"))
-        .unwrap_or_else(|| std::path::PathBuf::from("server.cjs"));
-
+    let server_js = resolve_server_js();
     let port = detect_port_from_config(config_path);
 
     let mut cmd = Command::new(&node_path);

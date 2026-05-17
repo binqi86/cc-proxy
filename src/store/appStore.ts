@@ -120,6 +120,7 @@ interface AppState {
 
   loadClaudeStatus: () => Promise<void>;
   loadCodexStatus: () => Promise<void>;
+  loadLocalizationStatus: () => Promise<void>;
   applyClaude3pConfig: () => Promise<void>;
   removeClaude3pConfig: () => Promise<void>;
   applyCodexConfig: () => Promise<void>;
@@ -133,7 +134,7 @@ function getProviderForMode(mode: ActiveMode, state: { providers: Record<string,
   return state.providers[id];
 }
 
-function getClaudeModels(providers: Record<string, ProviderConfig>, claudeProviderId: string): ClaudeModelEntry[] {
+export function getClaudeModels(providers: Record<string, ProviderConfig>, claudeProviderId: string): ClaudeModelEntry[] {
   const provider = providers[claudeProviderId];
   const claudeMap = provider?.claudeModelMap || {};
   const oneMMap = provider?.claudeModel1mMap || {};
@@ -414,6 +415,15 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadLocalizationStatus: async () => {
+    try {
+      const status = await api.localization.getStatus();
+      set({ localizationStatus: status });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
   loadCodexStatus: async () => {
     try {
       const status = await api.codex.getConfigStatus();
@@ -476,8 +486,9 @@ const useAppStore = create<AppState>((set, get) => ({
       }
       const provider = providers[codexProviderId];
       const defaultModel = strip1mSuffix(provider?.defaultModel || 'gpt-5-codex');
+      const contextWindow = provider?.codexContextWindow !== false; // default true
 
-      await api.codex.applyConfig(port, apiKey, defaultModel);
+      await api.codex.applyConfig(port, apiKey, defaultModel, contextWindow);
       const status = await api.codex.getConfigStatus();
       set({ codexConfigStatus: status, loading: false, toast: { message: 'Codex 配置已应用，请重启 Codex 以生效', type: 'success' } });
       get().addLog({
@@ -511,12 +522,9 @@ const useAppStore = create<AppState>((set, get) => ({
   applyLocalization: async () => {
     try {
       set({ loading: true, error: null });
-      const zhCN = '{}'; // placeholder - actual translations loaded from bundle
-      const desktop = '{}';
-      const statsig = '{}';
-      await api.localization.apply(zhCN, desktop, statsig);
+      const msg = await api.localization.applyBundled();
       const status = await api.localization.getStatus();
-      set({ localizationStatus: status, loading: false });
+      set({ localizationStatus: status, loading: false, toast: { message: msg, type: 'success' } });
       get().addLog({
         id: `log-${Date.now()}`,
         timestamp: new Date(),
@@ -524,7 +532,7 @@ const useAppStore = create<AppState>((set, get) => ({
         message: 'Claude Desktop 汉化已应用',
       });
     } catch (e) {
-      set({ error: String(e), loading: false });
+      set({ error: String(e), loading: false, toast: { message: String(e), type: 'error' } });
     }
   },
 

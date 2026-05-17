@@ -72,6 +72,24 @@ export default function SettingsPage() {
       <div className="settings-panel">
         <div className="px-5 py-4 border-b border-border/30"><h2 className="text-sm font-bold">高级配置</h2></div>
         <div className="settings-row"><span className="settings-label">最大请求体 (MB)</span><Input className="h-8 text-xs font-mono w-24" value={local.MAX_REQUEST_BODY_SIZE ? String(Number(local.MAX_REQUEST_BODY_SIZE) / 1048576) : '25'} onChange={e => { const mb = parseFloat(e.target.value) || 25; setF('MAX_REQUEST_BODY_SIZE', String(mb * 1048576)); }} /></div>
+        <div className="settings-row">
+          <span className="settings-label">调试日志</span>
+          <button
+            onClick={() => setF('DEBUG_REASONING', local.DEBUG_REASONING === '1' ? '0' : '1')}
+            className={cn(
+              'relative inline-flex h-6 w-10 items-center rounded-full transition-colors',
+              local.DEBUG_REASONING === '1' ? 'bg-amber-500' : 'bg-border'
+            )}
+          >
+            <span className={cn(
+              'inline-block h-4 w-4 rounded-full bg-white transition-transform',
+              local.DEBUG_REASONING === '1' ? 'translate-x-5' : 'translate-x-1'
+            )} />
+          </button>
+          <span className="text-xs text-muted-foreground ml-2">
+            {local.DEBUG_REASONING === '1' ? '已开启（重启后生效，写入 debug_logs/）' : '已关闭'}
+          </span>
+        </div>
       </div>
 
       {/* Theme */}

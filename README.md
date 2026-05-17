@@ -5,9 +5,16 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/chenyubinqi/cc-proxy"></a>
   <a href="https://nodejs.org/"><img alt="Node.js" src="https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js"></a>
   <a href="https://github.com/chenyubinqi/cc-proxy/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/chenyubinqi/cc-proxy/total?label=downloads"></a>
+  <a href="https://github.com/chenyubinqi/cc-proxy/releases/latest"><img alt="Version" src="https://img.shields.io/github/v/release/chenyubinqi/cc-proxy?include_prereleases"></a>
 </p>
 
-cc-proxy 是面向 Claude Code / Codex CLI 的本地大模型代理工具。它将 OpenAI Responses API 和 Anthropic Messages API 转换为国内大模型的 Chat Completions API，并以 macOS 菜单栏应用的形式运行，无 Dock 占用。
+<p align="center">
+  <img src="docs/main-window.png" alt="主界面" width="700">
+  <br>
+  <em>主界面 — 仪表盘、供应商管理、请求监控</em>
+</p>
+
+cc-proxy 是面向 Claude Code / Codex / Warp 的本地大模型代理工具。它将 OpenAI Responses API 和 Anthropic Messages API 转换为国内大模型的 Chat Completions API，并以 macOS 菜单栏应用的形式运行，无 Dock 占用。
 
 ## 设计原则
 
@@ -16,13 +23,14 @@ cc-proxy 是面向 Claude Code / Codex CLI 的本地大模型代理工具。它�
 - **协议转发** — `/v1/chat/completions` 请求原样透传，流式/非流式响应直接 pipe
 - **协议适配** — `/v1/responses`（OpenAI 新 API）和 `/v1/messages`（Anthropic API）自动转换为 Chat Completions 格式，响应再转回原格式
 - **模型映射** — 自动将 `gpt-5`、`gpt-5-codex` 等模型名映射为国内模型，可自定义
+- **推理兼容** — DeepSeek V4 等原生推理模型的 `reasoning_content` 自动在 Responses ↔ Chat 协议间双向转换，支持 Codex/Warp stateless 多轮推理保鲜
 
 ## 能做什么
 
 - 管理 DeepSeek、阿里云百炼、智谱 GLM、Moonshot、MiniMax、火山方舟等国内大模型供应商。
 - 一键切换供应商，代理自动重启生效。
 - 自动将 Claude Code / Codex 的境外模型名映射为国内模型，每个供应商独立配置。
-- 实时显示每条请求的模型路由、消息内容、响应状态和延迟。
+- 实时显示每条请求的模型路由和响应状态。
 - 内置供应商连接测速和余额查询。
 - 纯菜单栏应用，关闭窗口即隐藏到后台，代理持续运行。
 
@@ -113,21 +121,41 @@ npm run tauri build
 
 构建产物位于 `src-tauri/target/release/bundle/macos/`。
 
+## 更新日志
+
+### v2.1.0
+
+- **推理内容双向转换** — `reasoning_content` 在 Responses ↔ Chat Completions 协议间自动转换，支持 DeepSeek V4 等原生推理模型
+- **Stateless 多轮推理保鲜** — 支持 `encrypted_content` 机制，Warp 和 Codex 的 stateless 模式下推理内容不会在回合间丢失
+- **供应商配置向后兼容** — `providers.json` 同时支持旧字段（`baseUrl`）和新字段（`codexBaseUrl`/`claudeBaseUrl`）
+- **调试日志开关** — 设置 → 高级配置中可开启调试日志，方便排查问题（`DEBUG_REASONING=1`）
+- **开发体验优化** — `npm run tauri dev` 自动同步 `server.cjs`，无需手动拷贝
+
+### v2.0.0
+
+- 双模式供应商配置（Codex + Claude 独立供应商）
+- Codex Desktop 一键集成
+- 日志噪音过滤
+
 ## 常见问题
 
 ### 代理无法启动
 
 1. 确认 Node.js 已安装：`node --version`（需要 18+）
 2. 检查 `~/.cc-proxy/.env` 中 `TARGET_API_KEY` 已配置
-3. 查看应用内「代理」页面日志输出排查
+3. 在设置中开启调试日志，查看 `~/.cc-proxy/debug_logs/` 排查
 
-### Claude Code 连接代理失败
+### Claude Code / Codex 连接代理失败
 
 确认代理已启动（菜单栏图标为绿色），检查端口是否被占用：
 
 ```bash
 lsof -i :8088
 ```
+
+### Codex 提示 "reasoning_content must be passed back"
+
+这是 DeepSeek V4 等推理模型的已知行为。升级到 v2.1.0 即可自动处理。临时解决：在 Codex 中开一个新会话。
 
 ### 关闭窗口后代理还在运行吗
 

@@ -380,8 +380,13 @@ pub fn get_claude_config_status(gateway_url: &str) -> ClaudeConfigStatus {
         break;
     }
 
+    let url_matches = detected_gateway_url
+        .as_ref()
+        .map(|u| u == gateway_url)
+        .unwrap_or(false);
+
     ClaudeConfigStatus {
-        applied: config_file_exists && deployment_mode == "3p" && provider_is_gateway,
+        applied: config_file_exists && deployment_mode == "3p" && provider_is_gateway && url_matches,
         config_file_exists,
         deployment_mode,
         gateway_url: detected_gateway_url.unwrap_or_else(|| gateway_url.to_string()),

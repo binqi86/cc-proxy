@@ -275,6 +275,7 @@ pub fn apply_codex_config(
     port: u16,
     api_key: &str,
     default_model: &str,
+    context_window: bool,
 ) -> Result<CodexApplyResult, String> {
     let codex_dir = get_codex_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
     fs::create_dir_all(&codex_dir)
@@ -301,38 +302,50 @@ pub fn apply_codex_config(
         read_root_raw_value(&existing_config, "disable_response_storage"),
         true,
     );
-    let model_context_window_value = normalize_toml_int_value(
-        read_root_raw_value(&existing_config, "model_context_window"),
-        1_000_000,
-    );
-    let model_auto_compact_token_limit_value = normalize_toml_int_value(
-        read_root_raw_value(&existing_config, "model_auto_compact_token_limit"),
-        900_000,
-    );
+    let model_context_window_value = if context_window {
+        Some(normalize_toml_int_value(
+            read_root_raw_value(&existing_config, "model_context_window"),
+            1_000_000,
+        ))
+    } else { None };
+    let model_auto_compact_token_limit_value = if context_window {
+        Some(normalize_toml_int_value(
+            read_root_raw_value(&existing_config, "model_auto_compact_token_limit"),
+            900_000,
+        ))
+    } else { None };
 
-    let remainder = remove_root_keys(
-        &config_toml,
-        &[
-            "model_context_window",
-            "model_auto_compact_token_limit",
-            "model_provider",
-            "model",
-            "model_reasoning_effort",
-            "disable_response_storage",
-        ],
-    );
+    let mut remove_keys = vec![
+        "model_context_window",
+        "model_auto_compact_token_limit",
+        "model_provider",
+        "model",
+        "model_reasoning_effort",
+        "disable_response_storage",
+    ];
+    let remainder = remove_root_keys(&config_toml, &remove_keys);
     let provider_header = format!("[model_providers.{}]", provider_id);
     let (provider_block, other_remainder) = extract_table_block(&remainder, &provider_header);
     let other_remainder = remove_standalone_model_providers_header(&other_remainder);
-    let top_block = format!(
-        "model_provider = {}\nmodel = {}\nmodel_reasoning_effort = {}\ndisable_response_storage = {}\n\nmodel_context_window = {}\nmodel_auto_compact_token_limit = {}\n[model_providers]",
-        model_provider_value,
-        model_value,
-        model_reasoning_effort_value,
-        disable_response_storage_value,
-        model_context_window_value,
-        model_auto_compact_token_limit_value,
-    );
+    let top_block = if context_window {
+        format!(
+            "model_provider = {}\nmodel = {}\nmodel_reasoning_effort = {}\ndisable_response_storage = {}\n\nmodel_context_window = {}\nmodel_auto_compact_token_limit = {}\n[model_providers]",
+            model_provider_value,
+            model_value,
+            model_reasoning_effort_value,
+            disable_response_storage_value,
+            model_context_window_value.unwrap_or_default(),
+            model_auto_compact_token_limit_value.unwrap_or_default(),
+        )
+    } else {
+        format!(
+            "model_provider = {}\nmodel = {}\nmodel_reasoning_effort = {}\ndisable_response_storage = {}\n[model_providers]",
+            model_provider_value,
+            model_value,
+            model_reasoning_effort_value,
+            disable_response_storage_value,
+        )
+    };
     config_toml = match (provider_block, other_remainder.is_empty()) {
         (Some(block), true) => format!("{}\n\n{}\n", top_block, block),
         (Some(block), false) => format!("{}\n\n{}\n\n{}\n", top_block, block, other_remainder),

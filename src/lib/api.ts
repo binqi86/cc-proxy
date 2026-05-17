@@ -53,8 +53,8 @@ export const api = {
 
   codex: {
     getConfigStatus: () => invoke<CodexConfigStatus>('get_codex_config_status'),
-    applyConfig: (port: number, apiKey: string, defaultModel: string) =>
-      invoke<{codex_config_written: boolean; cc_switch_config_written: boolean; gateway_url: string; model_count: number}>('apply_codex_config', { port, apiKey, defaultModel }),
+    applyConfig: (port: number, apiKey: string, defaultModel: string, contextWindow: boolean = true) =>
+      invoke<{codex_config_written: boolean; cc_switch_config_written: boolean; gateway_url: string; model_count: number}>('apply_codex_config', { port, apiKey, defaultModel, contextWindow }),
     removeConfig: () => invoke<void>('remove_codex_config'),
   },
 
@@ -62,6 +62,7 @@ export const api = {
     getStatus: () => invoke<LocalizationStatus>('get_localization_status'),
     apply: (zhCnJson: string, desktopJson: string, statsigJson: string) =>
       invoke<string>('apply_chinese_localization', { zhCnJson, desktopJson, statsigJson }),
+    applyBundled: () => invoke<string>('apply_bundled_chinese_localization'),
     restore: () => invoke<string>('restore_chinese_localization'),
   },
 

@@ -3,6 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 
 const CLAUDE_APP_PATH: &str = "/Applications/Claude.app";
+
+const BUNDLED_ZH_CN: &str = include_str!("translations_zh-CN.json");
+const BUNDLED_DESKTOP_ZH_CN: &str = include_str!("translations_desktop-zh-CN.json");
+const BUNDLED_STATSIG_ZH_CN: &str = include_str!("translations_statsig-zh-CN.json");
 const I18N_DIR: &str = "Contents/Resources/ion-dist/i18n";
 const BACKUP_DIR: &str = "Library/Application Support/ClaudeCN/backups";
 const BACKUP_FILE: &str = "Claude-original.zip";
@@ -78,6 +82,23 @@ pub fn get_localization_status() -> LocalizationStatus {
     }
 }
 
+/// Recursively collect all JS files under a directory
+fn collect_js_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    let Ok(entries) = fs::read_dir(dir) else {
+        return files;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            files.extend(collect_js_files(&path));
+        } else if path.extension().map_or(false, |e| e == "js") {
+            files.push(path);
+        }
+    }
+    files
+}
+
 fn check_patched() -> bool {
     // Check if zh-CN.json exists in the i18n directory
     let zh_cn = i18n_target_dir().join("zh-CN.json");
@@ -91,18 +112,10 @@ fn check_patched() -> bool {
         return false;
     }
 
-    let entries = match fs::read_dir(&dist_dir) {
-        Ok(e) => e,
-        Err(_) => return false,
-    };
-
-    for entry in entries.flatten() {
-        let fname = entry.file_name().to_string_lossy().to_string();
-        if fname.starts_with("index-") && fname.ends_with(".js") {
-            if let Ok(content) = fs::read_to_string(entry.path()) {
-                if content.contains("\"zh-CN\"") {
-                    return true;
-                }
+    for path in collect_js_files(&dist_dir) {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if content.contains("\"zh-CN\"") {
+                return true;
             }
         }
     }
@@ -295,17 +308,14 @@ fn deep_merge(target: &mut serde_json::Value, source: &serde_json::Value) {
 
 fn patch_js_whitelist() -> Result<(), String> {
     let dist_dir = claude_app_path().join("Contents/Resources/ion-dist");
-    let entries = fs::read_dir(&dist_dir)
-        .map_err(|e| format!("Failed to read ion-dist directory: {}", e))?;
 
     let mut patched = false;
-    for entry in entries.flatten() {
-        let fname = entry.file_name().to_string_lossy().to_string();
-        if !fname.starts_with("index-") || !fname.ends_with(".js") {
-            continue;
-        }
+    for js_path in collect_js_files(&dist_dir) {
+        let fname = js_path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
 
-        let content = fs::read_to_string(entry.path())
+        let content = fs::read_to_string(&js_path)
             .map_err(|e| format!("Failed to read {}: {}", fname, e))?;
 
         // Don't patch if already has zh-CN
@@ -327,14 +337,14 @@ fn patch_js_whitelist() -> Result<(), String> {
         };
 
         if new_content != content {
-            fs::write(entry.path(), &new_content)
+            fs::write(&js_path, &new_content)
                 .map_err(|e| format!("Failed to write patched {}: {}", fname, e))?;
             patched = true;
         }
     }
 
     if !patched {
-        return Err("Could not find the language whitelist array in any index-*.js file. Claude Desktop may have been updated with a different format.".to_string());
+        return Err("Could not find the language whitelist array in any JS file under ion-dist/. Claude Desktop may have been updated with a different format.".to_string());
     }
     Ok(())
 }
@@ -389,18 +399,17 @@ fn quit_claude() -> Result<(), String> {
 }
 
 fn resign_app() -> Result<(), String> {
-    // Use ad-hoc signing (codesign --sign -)
-    // This creates a local signature without a developer certificate
+    // Use ad-hoc signing (codesign --sign -) WITHOUT --options runtime
+    // because ad-hoc signing + hardened runtime is incompatible on macOS 15+,
+    // producing an invalid signature that prevents the app from launching.
     let output = std::process::Command::new("codesign")
-        .args(["--force", "--sign", "-", "--options", "runtime", "--deep", CLAUDE_APP_PATH])
+        .args(["--force", "--sign", "-", "--deep", CLAUDE_APP_PATH])
         .output()
         .map_err(|e| format!("Failed to run codesign: {}", e))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        // Ad-hoc signing may fail for some configurations, that's ok
-        // The app will still work even without proper re-signing
-        eprintln!("codesign warning: {}", stderr);
+        return Err(format!("Failed to re-sign Claude.app: {}. Try restoring the original first.", stderr));
     }
     Ok(())
 }
@@ -467,10 +476,24 @@ fn reregister_app() -> Result<(), String> {
     }
 }
 
-fn run_admin_command(_cmd: &str) -> Result<(), String> {
-    // Note: For operations requiring admin privileges (writing to /Applications),
-    // the user must grant permission. We use osascript to prompt.
-    // The actual file operations use std::fs which will fail without permission.
-    // In a real implementation, we'd use AppleScript with administrator privileges.
+fn run_admin_command(cmd: &str) -> Result<(), String> {
+    // Use osascript with administrator privileges to execute the command
+    let script = format!(
+        r#"do shell script "{}" with administrator privileges"#,
+        cmd.replace("\"", "\\\"")
+    );
+    let output = std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .map_err(|e| format!("Failed to execute admin command: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Admin command failed: {}", stderr));
+    }
     Ok(())
+}
+
+pub fn apply_bundled_chinese_localization() -> Result<String, String> {
+    apply_chinese_localization(BUNDLED_ZH_CN, BUNDLED_DESKTOP_ZH_CN, BUNDLED_STATSIG_ZH_CN)
 }

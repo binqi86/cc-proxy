@@ -31,6 +31,12 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { loadClaudeStatus(); loadCodexStatus(); }, []);
+  // Reload status when desktop config changed from tray popup
+  useEffect(() => {
+    const s = () => { loadClaudeStatus(); loadCodexStatus(); };
+    document.addEventListener('desktop-config-changed', s);
+    return () => document.removeEventListener('desktop-config-changed', s);
+  }, [loadClaudeStatus, loadCodexStatus]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -156,71 +162,84 @@ export default function Dashboard() {
       <section>
         <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2.5">桌面集成</h2>
         <div className="panel overflow-hidden">
-          {/* ── Claude row ── */}
-          <div className="grid items-center px-4 py-2.5 border-b border-border/30" style={{ gridTemplateColumns: '1fr auto' }}>
-            <div className="flex items-center gap-2.5 text-[12px] min-w-0 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <ClaudeIcon size={14} />
-                <span className="font-semibold text-foreground">Claude Desktop</span>
-              </div>
-              <span className={`inline-flex items-center gap-1 text-[11px] font-semibold shrink-0 ${claudeConfigStatus?.applied ? 'text-emerald-400' : claudeConfigStatus?.config_file_exists ? 'text-amber-400' : 'text-muted-foreground'}`}>
-                <span className={`inline-block w-1.5 h-1.5 rounded-full ${claudeConfigStatus?.applied ? 'bg-emerald-400' : claudeConfigStatus?.config_file_exists ? 'bg-amber-400' : 'bg-slate-500'}`} />
-                {claudeConfigStatus?.applied ? '已配置' : claudeConfigStatus?.config_file_exists ? '异常' : '未配置'}
-              </span>
-              {!claudeConfigStatus?.claude_app_exists && (
-                <span className="text-[10px] text-amber-400 font-semibold shrink-0">未检测到应用</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
-              {claudeConfigStatus?.applied && (
-                <button onClick={removeClaude3pConfig} disabled={loading}
-                  className="text-[10px] font-semibold text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md border border-border hover:border-destructive/30">
-                  清除
-                </button>
-              )}
-              <button onClick={async () => { await applyClaude3pConfig(); setAppliedBtn('claude'); }} disabled={loading}
-                className={cn(
-                  'text-[10px] font-semibold px-2 py-1 rounded-md disabled:opacity-50 transition-all duration-200',
-                  appliedBtn === 'claude'
-                    ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
-                    : 'text-white bg-primary hover:opacity-90'
-                )}>
-                {appliedBtn === 'claude' ? '已应用' : '应用'}
-              </button>
-            </div>
-          </div>
-          {/* ── Codex row ── */}
-          {codexProviderId && (
-            <div className="grid items-center px-4 py-2.5" style={{ gridTemplateColumns: '1fr auto' }}>
-              <div className="flex items-center gap-2.5 text-[12px] min-w-0 flex-wrap">
+          <div className="grid grid-cols-2 divide-x divide-border/30">
+            {/* ── Codex (left) ── */}
+            <div className="px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2 text-[12px] min-w-0 flex-wrap">
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <CodexIcon size={14} />
                   <span className="font-semibold text-foreground">Codex</span>
                 </div>
-                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold shrink-0 ${codexConfigStatus?.applied ? 'text-emerald-400' : codexConfigStatus?.config_file_exists ? 'text-amber-400' : 'text-muted-foreground'}`}>
-                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${codexConfigStatus?.applied ? 'bg-emerald-400' : codexConfigStatus?.config_file_exists ? 'bg-amber-400' : 'bg-slate-500'}`} />
-                  {codexConfigStatus?.applied ? '已配置' : codexConfigStatus?.config_file_exists ? '异常' : '未配置'}
-                </span>
+                {codexConfigStatus && (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold shrink-0 ${codexConfigStatus.applied ? 'text-emerald-400' : codexConfigStatus.config_file_exists ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${codexConfigStatus.applied ? 'bg-emerald-400' : codexConfigStatus.config_file_exists ? 'bg-amber-400' : 'bg-slate-500'}`} />
+                    {codexConfigStatus.applied ? '已配置' : codexConfigStatus.config_file_exists ? '异常' : '未配置'}
+                  </span>
+                )}
+                {codexProvider && !codexConfigStatus && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold shrink-0 text-muted-foreground">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500" />
+                    未配置
+                  </span>
+                )}
               </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+              <div className="flex items-center gap-1.5">
                 {codexConfigStatus?.applied && (
                   <button onClick={removeCodexConfig} disabled={loading}
                     className="text-[10px] font-semibold text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md border border-border hover:border-destructive/30">
                     清除
                   </button>
                 )}
-                <button onClick={async () => { await applyCodexConfig(); setAppliedBtn('codex'); }} disabled={loading}
+                {codexProviderId && (
+                  <button onClick={async () => { await applyCodexConfig(); setAppliedBtn('codex'); }} disabled={loading}
+                    className={cn(
+                      'text-[10px] font-semibold px-2 py-1 rounded-md disabled:opacity-50 transition-all duration-200',
+                      appliedBtn === 'codex'
+                        ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
+                        : 'text-white bg-primary hover:opacity-90'
+                    )}>
+                    {appliedBtn === 'codex' ? '已应用' : '应用'}
+                  </button>
+                )}
+                {!codexProviderId && (
+                  <span className="text-[10px] text-muted-foreground">请先选择 Codex 供应商</span>
+                )}
+              </div>
+            </div>
+            {/* ── Claude (right) ── */}
+            <div className="px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2 text-[12px] min-w-0 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <ClaudeIcon size={14} />
+                  <span className="font-semibold text-foreground">Claude</span>
+                </div>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold shrink-0 ${claudeConfigStatus?.applied ? 'text-emerald-400' : claudeConfigStatus?.config_file_exists ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${claudeConfigStatus?.applied ? 'bg-emerald-400' : claudeConfigStatus?.config_file_exists ? 'bg-amber-400' : 'bg-slate-500'}`} />
+                  {claudeConfigStatus?.applied ? '已配置' : claudeConfigStatus?.config_file_exists ? '异常' : '未配置'}
+                </span>
+                {!claudeConfigStatus?.claude_app_exists && (
+                  <span className="text-[10px] text-amber-400 font-semibold shrink-0">未检测到应用</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {claudeConfigStatus?.applied && (
+                  <button onClick={removeClaude3pConfig} disabled={loading}
+                    className="text-[10px] font-semibold text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md border border-border hover:border-destructive/30">
+                    清除
+                  </button>
+                )}
+                <button onClick={async () => { await applyClaude3pConfig(); setAppliedBtn('claude'); }} disabled={loading}
                   className={cn(
                     'text-[10px] font-semibold px-2 py-1 rounded-md disabled:opacity-50 transition-all duration-200',
-                    appliedBtn === 'codex'
+                    appliedBtn === 'claude'
                       ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
                       : 'text-white bg-primary hover:opacity-90'
                   )}>
-                  {appliedBtn === 'codex' ? '已应用' : '应用'}
+                  {appliedBtn === 'claude' ? '已应用' : '应用'}
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </section>
 

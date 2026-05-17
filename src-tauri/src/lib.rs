@@ -576,16 +576,24 @@ async fn get_codex_config_status() -> Result<codex_config::CodexConfigStatus, St
 
 #[tauri::command]
 async fn apply_codex_config(
+    app: AppHandle,
     port: u16,
     api_key: String,
     default_model: String,
+    context_window: bool,
 ) -> Result<codex_config::CodexApplyResult, String> {
-    codex_config::apply_codex_config(port, &api_key, &default_model)
+    let result = codex_config::apply_codex_config(port, &api_key, &default_model, context_window)?;
+    sync_config_to_popup(&app, "desktop-config-changed", &serde_json::json!({ "codex": true }));
+    sync_to_window(&app, "main", "desktop-config-changed", &serde_json::json!({ "codex": true }));
+    Ok(result)
 }
 
 #[tauri::command]
-async fn remove_codex_config() -> Result<(), String> {
-    codex_config::remove_codex_config()
+async fn remove_codex_config(app: AppHandle) -> Result<(), String> {
+    codex_config::remove_codex_config()?;
+    sync_config_to_popup(&app, "desktop-config-changed", &serde_json::json!({ "codex": false }));
+    sync_to_window(&app, "main", "desktop-config-changed", &serde_json::json!({ "codex": false }));
+    Ok(())
 }
 
 // ── Claude Desktop 3P config commands ──
@@ -599,16 +607,23 @@ async fn get_claude_config_status() -> Result<claude_config::ClaudeConfigStatus,
 
 #[tauri::command]
 async fn apply_claude_3p_config(
+    app: AppHandle,
     port: u16,
     api_key: String,
     models: Vec<claude_config::ClaudeModelEntry>,
 ) -> Result<String, String> {
-    claude_config::write_claude_3p_config(port, &api_key, &models)
+    let result = claude_config::write_claude_3p_config(port, &api_key, &models)?;
+    sync_config_to_popup(&app, "desktop-config-changed", &serde_json::json!({ "claude": true }));
+    sync_to_window(&app, "main", "desktop-config-changed", &serde_json::json!({ "claude": true }));
+    Ok(result)
 }
 
 #[tauri::command]
-async fn remove_claude_3p_config() -> Result<(), String> {
-    claude_config::remove_claude_3p_config()
+async fn remove_claude_3p_config(app: AppHandle) -> Result<(), String> {
+    claude_config::remove_claude_3p_config()?;
+    sync_config_to_popup(&app, "desktop-config-changed", &serde_json::json!({ "claude": false }));
+    sync_to_window(&app, "main", "desktop-config-changed", &serde_json::json!({ "claude": false }));
+    Ok(())
 }
 
 #[tauri::command]
@@ -625,16 +640,28 @@ async fn get_localization_status() -> Result<localization::LocalizationStatus, S
 
 #[tauri::command]
 async fn apply_chinese_localization(
+    app: AppHandle,
     zh_cn_json: String,
     desktop_json: String,
     statsig_json: String,
 ) -> Result<String, String> {
-    localization::apply_chinese_localization(&zh_cn_json, &desktop_json, &statsig_json)
+    let result = localization::apply_chinese_localization(&zh_cn_json, &desktop_json, &statsig_json)?;
+    sync_config_to_popup(&app, "localization-changed", &serde_json::json!({ "applied": true }));
+    Ok(result)
 }
 
 #[tauri::command]
-async fn restore_chinese_localization() -> Result<String, String> {
-    localization::restore_chinese_localization()
+async fn apply_bundled_chinese_localization(app: AppHandle) -> Result<String, String> {
+    let result = localization::apply_bundled_chinese_localization()?;
+    sync_config_to_popup(&app, "localization-changed", &serde_json::json!({ "applied": true }));
+    Ok(result)
+}
+
+#[tauri::command]
+async fn restore_chinese_localization(app: AppHandle) -> Result<String, String> {
+    let result = localization::restore_chinese_localization()?;
+    sync_config_to_popup(&app, "localization-changed", &serde_json::json!({ "applied": false }));
+    Ok(result)
 }
 
 // ── Balance query ──
@@ -792,6 +819,7 @@ pub fn run() {
             remove_codex_config,
             get_localization_status,
             apply_chinese_localization,
+            apply_bundled_chinese_localization,
             restore_chinese_localization,
             query_provider_balance,
         ])

@@ -7,6 +7,18 @@ const { URL } = require("node:url");
 
 loadDotEnv(path.join(__dirname, ".env"));
 
+const DEBUG_DIR = process.env.DEBUG_DIR || path.join(__dirname, "debug_logs");
+
+function debugLog(label, payload) {
+  if (process.env.DEBUG_REASONING !== "1") return;
+  try {
+    if (!fs.existsSync(DEBUG_DIR)) fs.mkdirSync(DEBUG_DIR, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const file = path.join(DEBUG_DIR, `${ts}_${label}.json`);
+    fs.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+  } catch (e) { /* never break the proxy */ }
+}
+
 const PROVIDER_CONFIG_PATH = process.env.PROVIDER_CONFIG_PATH || path.join(__dirname, "providers.json");
 const PORT = Number(process.env.PORT || 8088);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -35,16 +47,20 @@ function loadProviderConfig(mode) {
   const modeBaseUrl = mode === "CLAUDE" ? preset.claudeBaseUrl : preset.codexBaseUrl;
   const modeChatPath = mode === "CLAUDE" ? preset.claudeChatPath : preset.codexChatPath;
   const modeModelsPath = mode === "CLAUDE" ? preset.claudeModelsPath : preset.codexModelsPath;
+  // Backward compat: fall back to old generic fields if mode-specific ones are empty
+  const fallbackBaseUrl = modeBaseUrl || preset.baseUrl || "";
+  const fallbackChatPath = modeChatPath || preset.chatPath || "/v1/chat/completions";
+  const fallbackModelsPath = modeModelsPath || preset.modelsPath || "/v1/models";
   const baseUrl = stripTrailingSlash(
     process.env[`${mode}_TARGET_BASE_URL`]
-      || modeBaseUrl
+      || fallbackBaseUrl
       || ""
   );
   const chatPath = process.env[`${mode}_TARGET_CHAT_PATH`]
-    || modeChatPath
+    || fallbackChatPath
     || "/v1/chat/completions";
   const modelsPath = process.env[`${mode}_TARGET_MODELS_PATH`]
-    || modeModelsPath
+    || fallbackModelsPath
     || "/v1/models";
   const defaultModel = sanitizeModelName(preset.defaultModel || process.env.DEFAULT_MODEL || "");
   const reasoningMapping = {
@@ -187,8 +203,21 @@ async function handleChatPassthrough(req, res, provider) {
 
 async function handleResponses(req, res, provider) {
   const responsesRequest = await readJson(req);
+  debugLog("rq_input", responsesRequest);
+
+  // Warp/Codex stateless mode: pre-extract encrypted_content from reasoning items
+  if (Array.isArray(responsesRequest.input)) {
+    for (const item of responsesRequest.input) {
+      if (item && item.type === "reasoning" && typeof item.encrypted_content === "string" && item.encrypted_content) {
+        item.reasoning_content = item.reasoning_content || item.encrypted_content;
+      }
+    }
+  }
+
   const chatRequest = responsesToChatRequest(responsesRequest, provider);
   chatRequest.__endpoint = "/v1/responses";
+  patchAssistantReasoningForThinking(chatRequest);
+  debugLog("rq_chat", chatRequest);
 
   if (chatRequest.stream) {
     return proxyResponsesStream(responsesRequest, chatRequest, res, provider);
@@ -224,6 +253,7 @@ async function proxyResponsesStream(originalRequest, chatRequest, res, provider)
   const upstream = await fetchChatCompletion(chatRequest, provider);
   if (!upstream.ok || !upstream.body) {
     const body = await readUpstreamJson(upstream);
+    debugLog("rq_error", { status: upstream.status, body });
     return sendJson(res, upstream.status, body);
   }
 
@@ -345,7 +375,7 @@ function convertChatStreamToResponses(chunk, state, originalRequest, modelName) 
         state.reasoningActive = true;
         state.reasoningItemId = `rs_${state.responseId}_0`;
         send("response.output_item.added", { type: "response.output_item.added", output_index: 0,
-          item: { id: state.reasoningItemId, type: "reasoning", status: "in_progress", summary: [] } });
+          item: { id: state.reasoningItemId, type: "reasoning", status: "in_progress", content: [], summary: [] } });
         send("response.reasoning_summary_part.added", { type: "response.reasoning_summary_part.added",
           item_id: state.reasoningItemId, output_index: 0, summary_index: 0,
           part: { type: "summary_text", text: "" } });
@@ -424,7 +454,9 @@ function closeReasoningBlock(state, send) {
     part: { type: "summary_text", text: full } });
   send("response.output_item.done", { type: "response.output_item.done", output_index: 0,
     item: { id: state.reasoningItemId, type: "reasoning", status: "completed",
-      summary: [{ type: "summary_text", text: full }] } });
+      content: [{ type: "reasoning_text", text: full }],
+      summary: [{ type: "summary_text", text: full }],
+      encrypted_content: full } });
   state.reasoningActive = false;
 }
 
@@ -461,7 +493,9 @@ function buildResponsesCompletedEvent(state, originalRequest, modelName) {
   const output = [];
   if (state.reasoningBuf) {
     output.push({ id: state.reasoningItemId, type: "reasoning", status: "completed",
-      summary: [{ type: "summary_text", text: state.reasoningBuf }] });
+      content: [{ type: "reasoning_text", text: state.reasoningBuf }],
+      summary: [{ type: "summary_text", text: state.reasoningBuf }],
+      encrypted_content: state.reasoningBuf });
   }
   if (state.msgId) {
     output.push({ id: state.msgId, type: "message", status: "completed", role: "assistant",
@@ -524,7 +558,9 @@ function convertChatResponseToResponses(chatBody, originalRequest, modelName) {
   // Reasoning
   if (message.reasoning_content) {
     output.push({ id: `rs_resp_0`, type: "reasoning", status: "completed",
-      summary: [{ type: "summary_text", text: message.reasoning_content }] });
+      content: [{ type: "reasoning_text", text: message.reasoning_content }],
+      summary: [{ type: "summary_text", text: message.reasoning_content }],
+      encrypted_content: message.reasoning_content });
     outputIndex = 1;
   }
 
@@ -622,20 +658,12 @@ function responsesToChatRequest(request, provider) {
           ? `${target.reasoning_content}\n${reasoning}`
           : reasoning;
       };
-      const takePendingReasoning = () => {
-        const reasoning = pendingReasoningContent.trim();
-        pendingReasoningContent = "";
-        return reasoning;
-      };
-      const shouldForceAssistantReasoning = needsReasoningContentPatch(request);
+      const takePendingReasoning = () => pendingReasoningContent.trim();
       const flushToolCalls = () => {
         if (pendingToolCalls.length === 0) return;
-        // CCX: merge consecutive function_calls into one assistant message
         const msg = { role: "assistant", tool_calls: pendingToolCalls.splice(0) };
         const reasoning = takePendingReasoning();
-        if (shouldForceAssistantReasoning) {
-          msg.reasoning_content = reasoning || "";
-        } else {
+        if (reasoning) {
           appendReasoning(msg, reasoning);
         }
         chat.messages.push(msg);
@@ -654,9 +682,7 @@ function responsesToChatRequest(request, provider) {
             const reasoning = role === "assistant"
               ? (explicitReasoning || takePendingReasoning())
               : "";
-            if (role === "assistant" && shouldForceAssistantReasoning) {
-              msg.reasoning_content = reasoning || "";
-            } else {
+            if (role === "assistant" && reasoning) {
               appendReasoning(msg, reasoning);
             }
             chat.messages.push(msg);
@@ -669,13 +695,7 @@ function responsesToChatRequest(request, provider) {
           case "reasoning": {
             const reasoning = extractReasoningText(item);
             if (reasoning) {
-              if (lastAssistantMessage && pendingToolCalls.length === 0) {
-                appendReasoning(lastAssistantMessage, reasoning);
-              } else {
-                pendingReasoningContent = pendingReasoningContent
-                  ? `${pendingReasoningContent}\n${reasoning}`
-                  : reasoning;
-              }
+              pendingReasoningContent = reasoning;
             }
             break;
           }
@@ -702,10 +722,10 @@ function responsesToChatRequest(request, provider) {
     }
   }
 
-  // CCX: normalizeOpenAIToolCallMessageOrder — ensure tool results follow their tool calls
+  // CCX: normalizeOpenAIToolCallMessageOrder
   chat.messages = normalizeMessageOrder(chat.messages);
 
-  // CCX: responsesToolsToOpenAI — filters tools with empty name (responses_tools.go:40-42)
+  // CCX: responsesToolsToOpenAI
   if (Array.isArray(request.tools) && request.tools.length > 0) {
     chat.tools = request.tools
       .map(t => {
@@ -728,7 +748,7 @@ function responsesToChatRequest(request, provider) {
   return chat;
 }
 
-// CCX: normalizeOpenAIToolCallMessageOrder — ensure tool results follow their tool calls
+// CCX: normalizeOpenAIToolCallMessageOrder
 function normalizeMessageOrder(messages) {
   const result = [...messages];
   for (let i = 0; i < result.length; i++) {
@@ -781,6 +801,8 @@ function extractReasoningText(item) {
   if (!item || typeof item !== "object") return "";
   const explicit = extractExplicitReasoningText(item);
   if (explicit) return explicit;
+  // Warp stateless mode: encrypted_content contains the reasoning plain text
+  if (typeof item.encrypted_content === "string" && item.encrypted_content) return item.encrypted_content;
   if (typeof item.text === "string") return item.text;
   if (Array.isArray(item.summary)) {
     return item.summary
@@ -934,11 +956,8 @@ function sendSse(res, event, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-// (normalizeToolChoice removed — CCX passes tool_choice through raw)
-
 function normalizeRole(role, normalize) {
   if (!normalize) return role;
-  // CCX: map non-standard roles to standard ones
   if (role === "developer") return "system";
   if (role === "assistant" || role === "system" || role === "tool") return role;
   return "user";
@@ -1123,8 +1142,6 @@ function resolveModelMap(modelMap, defaultModel) {
   );
 }
 
-// (deprecated functions removed — CCX-style clean pipeline)
-
 function ts() {
   return new Date().toLocaleTimeString('zh-CN', { hour12: false });
 }
@@ -1246,7 +1263,7 @@ function sanitizeModelName(value) {
   if (value == null) return "";
   const normalized = String(value)
     .replace(/\x1B\[[0-9;]*m/g, "")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .replace(/[ -]/g, "")
     .trim();
   return normalized;
 }
@@ -1624,6 +1641,7 @@ async function proxyAnthropicStreaming(originalRequest, chatRequest, res, provid
   const upstream = await fetchChatCompletion(chatRequest, provider);
   if (!upstream.ok || !upstream.body) {
     const body = await readUpstreamJson(upstream);
+    debugLog("rq_error", { status: upstream.status, body });
     return sendJson(res, upstream.status, body);
   }
 

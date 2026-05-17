@@ -87,7 +87,7 @@ function isClaudeSlotUsed(cm: Record<string, string> | undefined, slotKey: strin
 }
 
 const PRESETS: Record<string, { name: string; codexBaseUrl: string; icon: string; codexChatPath: string; defaultModel: string; modelMap: Record<string,string> }> = {
-  deepseek: { name: 'DeepSeek', codexBaseUrl: 'https://api.deepseek.com', icon: 'D', codexChatPath: '/v1/chat/completions', defaultModel: 'deepseek-chat', modelMap: { 'gpt-5': 'deepseek-chat', 'gpt-5-codex': 'deepseek-chat', 'gpt-5-mini': 'deepseek-chat', 'gpt-5-nano': 'deepseek-chat', 'o4-mini': 'deepseek-chat', 'gpt-5.1': 'deepseek-chat', 'gpt-5.1-codex': 'deepseek-chat', 'gpt-5.1-codex-max': 'deepseek-chat' } },
+  deepseek: { name: 'DeepSeek', codexBaseUrl: 'https://api.deepseek.com', icon: 'D', codexChatPath: '/v1/chat/completions', defaultModel: 'deepseek-chat', modelMap: { 'gpt-5.5': 'deepseek-chat', 'gpt-5.4': 'deepseek-chat', 'gpt-5': 'deepseek-chat', 'gpt-5-codex': 'deepseek-chat', 'gpt-5-mini': 'deepseek-chat', 'gpt-5-nano': 'deepseek-chat', 'o4-mini': 'deepseek-chat', 'gpt-5.1': 'deepseek-chat', 'gpt-5.1-codex': 'deepseek-chat', 'gpt-5.1-codex-max': 'deepseek-chat' } },
   dashscope: { name: '阿里云百炼', codexBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', icon: '百', codexChatPath: '/v1/chat/completions', defaultModel: 'qwen-plus', modelMap: { 'gpt-5': 'qwen-plus', 'gpt-5-codex': 'qwen-max', 'gpt-5-mini': 'qwen-turbo', 'o4-mini': 'qwen-plus' } },
   zhipu: { name: '智谱 GLM', codexBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', icon: '智', codexChatPath: '/v1/chat/completions', defaultModel: 'glm-4-plus', modelMap: { 'gpt-5': 'glm-4-plus', 'gpt-5-codex': 'glm-4-plus', 'gpt-5-mini': 'glm-4-flash', 'o4-mini': 'glm-4-flash' } },
   moonshot: { name: 'Moonshot', codexBaseUrl: 'https://api.moonshot.cn/v1', icon: 'M', codexChatPath: '/v1/chat/completions', defaultModel: 'moonshot-v1-8k', modelMap: { 'gpt-5': 'moonshot-v1-8k', 'gpt-5-codex': 'moonshot-v1-32k', 'gpt-5-mini': 'moonshot-v1-8k' } },
@@ -361,6 +361,23 @@ export default function ProvidersPage() {
               onChange={e => setEditing(editing ? { ...editing, codexApiKey: e.target.value } : null)}
               placeholder="留空使用公共 API Key" className="font-mono text-xs" />
           </Field>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setEditing(editing ? { ...editing, codexContextWindow: !editing.codexContextWindow } : null)}
+              className={cn(
+                'relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0',
+                editing?.codexContextWindow !== false ? 'bg-blue-500' : 'bg-border'
+              )}
+            >
+              <span className={cn(
+                'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
+                editing?.codexContextWindow !== false ? 'translate-x-4' : 'translate-x-0.5'
+              )} />
+            </button>
+            <span className="text-xs text-muted-foreground">
+              1M 上下文窗口{editing?.codexContextWindow !== false ? '（已启用）' : '（已关闭）'}
+            </span>
+          </div>
           <Field label="模型映射 (Codex → 上游模型)">
             <div className="border border-border rounded-xl divide-y divide-border/30 overflow-hidden">
               {!Object.keys(editing?.modelMap || {}).length ? (
@@ -396,8 +413,11 @@ export default function ProvidersPage() {
                           onChange={e => {
                             if (!editing) return;
                             const m = { ...editing.modelMap };
-                            delete m[from];
-                            if (e.target.value) m[e.target.value] = to;
+                            const newKey = e.target.value.trim();
+                            if (from !== newKey) {
+                              if (from) delete m[from];
+                              m[newKey] = to;
+                            }
                             setEditing({ ...editing, modelMap: m });
                           }}
                         />
@@ -528,12 +548,15 @@ export default function ProvidersPage() {
                             if (!editing) return;
                             const cm = { ...(editing.claudeModelMap || {}) };
                             const flags = { ...(editing.claudeModel1mMap || {}) };
-                            delete cm[slot];
-                            if (e.target.value) {
-                              cm[e.target.value] = strip1mSuffix(target);
-                              if (flags[slot]) flags[e.target.value] = true;
+                            const newKey = e.target.value.trim();
+                            if (newKey && newKey !== slot) {
+                              delete cm[slot];
+                              cm[newKey] = strip1mSuffix(target);
+                              if (flags[slot]) { flags[newKey] = true; delete flags[slot]; }
+                            } else if (!newKey) {
+                              // Keep entry with current slot, user may re-edit
+                              cm[slot] = strip1mSuffix(target);
                             }
-                            delete flags[slot];
                             setEditing({ ...editing, claudeModelMap: cm, claudeModel1mMap: flags });
                           }}
                         />
