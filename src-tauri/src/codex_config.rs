@@ -315,7 +315,7 @@ pub fn apply_codex_config(
         ))
     } else { None };
 
-    let mut remove_keys = vec![
+    let remove_keys = vec![
         "model_context_window",
         "model_auto_compact_token_limit",
         "model_provider",
