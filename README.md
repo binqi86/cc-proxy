@@ -1,11 +1,11 @@
 # cc-proxy
 
 <p align="center">
-  <a href="https://github.com/chenyubinqi/cc-proxy/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/chenyubinqi/cc-proxy?style=social"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/chenyubinqi/cc-proxy"></a>
+  <a href="https://github.com/binqi86/cc-proxy/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/binqi86/cc-proxy?style=social"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/binqi86/cc-proxy"></a>
   <a href="https://nodejs.org/"><img alt="Node.js" src="https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js"></a>
-  <a href="https://github.com/chenyubinqi/cc-proxy/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/chenyubinqi/cc-proxy/total?label=downloads"></a>
-  <a href="https://github.com/chenyubinqi/cc-proxy/releases/latest"><img alt="Version" src="https://img.shields.io/github/v/release/chenyubinqi/cc-proxy?include_prereleases"></a>
+  <a href="https://github.com/binqi86/cc-proxy/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/binqi86/cc-proxy/total?label=downloads"></a>
+  <a href="https://github.com/binqi86/cc-proxy/releases/latest"><img alt="Version" src="https://img.shields.io/github/v/release/binqi86/cc-proxy?include_prereleases"></a>
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@ cc-proxy 是面向 Claude Code / Codex / Warp 的本地大模型代理工具。�
 
 ## 下载
 
-前往 [GitHub Releases](https://github.com/chenyubinqi/cc-proxy/releases) 下载最新版本：
+前往 [GitHub Releases](https://github.com/binqi86/cc-proxy/releases) 下载最新版本：
 
 - `cc-proxy_<version>_aarch64.dmg`：macOS 拖拽安装包
 
@@ -116,7 +116,7 @@ o4-mini     → 供应商默认模型
 ## 本地开发
 
 ```bash
-git clone https://github.com/chenyubinqi/cc-proxy.git
+git clone https://github.com/binqi86/cc-proxy.git
 cd cc-proxy
 npm install
 npm run tauri dev
