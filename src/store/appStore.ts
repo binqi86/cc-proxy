@@ -14,9 +14,6 @@ import type {
 } from '@/lib/config';
 
 const MODEL_1M_SUFFIX = '[1m]';
-const DEFAULT_CODEX_CHAT_PATH = '/v1/chat/completions';
-const DEFAULT_CLAUDE_CHAT_PATH = '/v1/chat/completions';
-const DEFAULT_MODELS_PATH = '/v1/models';
 
 function strip1mSuffix(value: string): string {
   return value.replace(/\[1m\]$/, '').trim();
@@ -29,19 +26,11 @@ function has1mSuffix(value: string): boolean {
 function normalizeProviderEndpoints(provider: ProviderConfig): ProviderConfig {
   const codexBaseUrl = (provider.codexBaseUrl ?? '').trim();
   const claudeBaseUrl = (provider.claudeBaseUrl ?? '').trim();
-  const codexChatPath = (provider.codexChatPath ?? DEFAULT_CODEX_CHAT_PATH).trim();
-  const claudeChatPath = (provider.claudeChatPath ?? DEFAULT_CLAUDE_CHAT_PATH).trim();
-  const codexModelsPath = (provider.codexModelsPath ?? DEFAULT_MODELS_PATH).trim();
-  const claudeModelsPath = (provider.claudeModelsPath ?? DEFAULT_MODELS_PATH).trim();
 
   return {
     ...provider,
     codexBaseUrl,
-    codexChatPath,
-    codexModelsPath,
     claudeBaseUrl,
-    claudeChatPath,
-    claudeModelsPath,
   };
 }
 

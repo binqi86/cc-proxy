@@ -2,11 +2,9 @@
   "dashscope": {
     "apiKey": "",
     "codexBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
-    "codexChatPath": "/v1/chat/completions",
-    "codexModelsPath": "/v1/models",
+    "codexUpstreamProtocol": "chat-completions",
     "claudeBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
-    "claudeChatPath": "/v1/chat/completions",
-    "claudeModelsPath": "/v1/models",
+    "claudeUpstreamProtocol": "chat-completions",
     "defaultModel": "qwen-plus",
     "id": "dashscope",
     "modelMap": {
@@ -20,11 +18,9 @@
   "deepseek": {
     "apiKey": "",
     "codexBaseUrl": "https://api.deepseek.com",
-    "codexChatPath": "/v1/chat/completions",
-    "codexModelsPath": "/v1/models",
-    "claudeBaseUrl": "https://api.deepseek.com/anthropic",
-    "claudeChatPath": "/v1/messages",
-    "claudeModelsPath": "/v1/models",
+    "codexUpstreamProtocol": "chat-completions",
+    "claudeBaseUrl": "https://api.deepseek.com",
+    "claudeUpstreamProtocol": "chat-completions",
     "defaultModel": "deepseek-chat",
     "id": "deepseek",
     "modelMap": {
@@ -38,11 +34,9 @@
   "minimax": {
     "apiKey": "",
     "codexBaseUrl": "https://api.minimax.io",
-    "codexChatPath": "/v1/chat/completions",
-    "codexModelsPath": "/v1/models",
+    "codexUpstreamProtocol": "chat-completions",
     "claudeBaseUrl": "https://api.minimax.io",
-    "claudeChatPath": "/v1/chat/completions",
-    "claudeModelsPath": "/v1/models",
+    "claudeUpstreamProtocol": "chat-completions",
     "defaultModel": "MiniMax-M2.5",
     "id": "minimax",
     "modelMap": {
@@ -56,11 +50,9 @@
   "moonshot": {
     "apiKey": "",
     "codexBaseUrl": "https://api.moonshot.cn",
-    "codexChatPath": "/v1/chat/completions",
-    "codexModelsPath": "/v1/models",
+    "codexUpstreamProtocol": "chat-completions",
     "claudeBaseUrl": "https://api.moonshot.cn",
-    "claudeChatPath": "/v1/chat/completions",
-    "claudeModelsPath": "/v1/models",
+    "claudeUpstreamProtocol": "chat-completions",
     "defaultModel": "moonshot-v1-8k",
     "id": "moonshot",
     "modelMap": {
@@ -73,13 +65,11 @@
   },
   "volcengine-coding": {
     "apiKey": "",
-    "codexBaseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "codexChatPath": "/chat/completions",
-    "codexModelsPath": "/models",
-    "claudeBaseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "claudeChatPath": "/chat/completions",
-    "claudeModelsPath": "/models",
-    "defaultModel": "ark-code-latest",
+    "codexBaseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+    "codexUpstreamProtocol": "chat-completions",
+    "claudeBaseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+    "claudeUpstreamProtocol": "chat-completions",
+    "defaultModel": "doubao-seed-1-6-251015",
     "id": "volcengine-coding",
     "modelMap": {
       "gpt-4.1": "$DEFAULT_MODEL",
@@ -87,21 +77,14 @@
       "gpt-5-codex": "$DEFAULT_MODEL",
       "o4-mini": "$DEFAULT_MODEL"
     },
-    "modelOptions": {
-      "minimax-m2.7": {
-        "systemMessageMode": "merge"
-      }
-    },
     "name": "火山方舟 coding plan"
   },
   "zhipu": {
     "apiKey": "",
-    "codexBaseUrl": "https://open.bigmodel.cn/api/paas",
-    "codexChatPath": "/v4/chat/completions",
-    "codexModelsPath": "/v4/models",
-    "claudeBaseUrl": "https://open.bigmodel.cn/api/paas",
-    "claudeChatPath": "/v4/chat/completions",
-    "claudeModelsPath": "/v4/models",
+    "codexBaseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "codexUpstreamProtocol": "chat-completions",
+    "claudeBaseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "claudeUpstreamProtocol": "chat-completions",
     "defaultModel": "glm-4-plus",
     "id": "zhipu",
     "modelMap": {

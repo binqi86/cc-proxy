@@ -30,6 +30,8 @@ src-tauri/target/
 .env
 .env.local
 .env.*.local
+.omc/
+.omx/
 
 # Config files (root - user specific)
 /providers.json

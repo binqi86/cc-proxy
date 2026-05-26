@@ -5,17 +5,13 @@ export interface ProviderConfig {
   codexApiKey?: string;    // override for Codex
   claudeApiKey?: string;   // override for Claude
   codexBaseUrl?: string;
-  codexChatPath?: string;
-  codexModelsPath?: string;
   claudeBaseUrl?: string;
-  claudeChatPath?: string;
-  claudeModelsPath?: string;
+  // Upstream protocol for Codex: 'chat-completions' (default) | 'responses'
+  codexUpstreamProtocol?: string;
   defaultModel: string;
   modelMap: Record<string, string>;
   claudeModelMap?: Record<string, string>;
   claudeModel1mMap?: Record<string, boolean>;
-  reasoningMapping?: Record<string, string>;
-  normalizeChatRoles?: boolean;
   codexContextWindow?: boolean;
 }
 
@@ -29,22 +25,10 @@ export interface EnvConfig {
   CODEX_TARGET_API_KEY?: string;
   CLAUDE_PROVIDER_PRESET?: string;
   CLAUDE_TARGET_API_KEY?: string;
-  CODEX_TARGET_BASE_URL?: string;
-  CODEX_TARGET_CHAT_PATH?: string;
-  CODEX_TARGET_MODELS_PATH?: string;
-  CLAUDE_TARGET_BASE_URL?: string;
-  CLAUDE_TARGET_CHAT_PATH?: string;
-  CLAUDE_TARGET_MODELS_PATH?: string;
-  TARGET_BASE_URL?: string;
-  TARGET_CHAT_PATH?: string;
-  TARGET_MODELS_PATH?: string;
   DEFAULT_MODEL?: string;
   REQUEST_TIMEOUT_MS?: string;
-  MODEL_MAP?: string;
-  CLAUDE_MODEL_MAP?: string;
-  REASONING_MAPPING?: string;
   MAX_REQUEST_BODY_SIZE?: string;
-  NORMALIZE_CHAT_ROLES?: string;
+  DEBUG_REASONING?: string;
 }
 
 export interface ServiceStatus {

@@ -8,27 +8,31 @@ pub struct ProxyProcess {
 }
 
 fn resolve_server_js() -> std::path::PathBuf {
-    // Always resolve to ~/.cc-proxy/server.cjs so __dirname points at the
-    // config directory (.env, providers.json, debug_logs).
-    let home: std::path::PathBuf = match std::env::var("HOME") {
-        Ok(h) => h.into(),
-        Err(_) => return std::path::PathBuf::from("server.cjs"),
-    };
-    let dest = home.join(".cc-proxy").join("server.cjs");
-
-    // 1. Search upward from cwd for a project-root server.cjs — copy it
+    // 1. Search upward from cwd for the project-root server.cjs (dev mode)
     let mut dir = std::env::current_dir().ok();
     while let Some(d) = dir {
         let candidate = d.join("server.cjs");
         if candidate.exists() {
-            let _ = std::fs::copy(&candidate, &dest);
-            return dest;
+            return candidate;
         }
         dir = d.parent().map(|p| p.to_path_buf());
     }
 
-    // 2. No project copy found — keep the existing one (production path)
-    dest
+    // 2. Packaged app: use server.cjs from bundle Resources
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(contents) = exe.parent().and_then(|p| p.parent()) {
+            let res = contents.join("Resources");
+            for sub in &["", "resources"] {
+                let candidate = if sub.is_empty() { res.join("server.cjs") } else { res.join(sub).join("server.cjs") };
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    // 3. Fallback (should not happen)
+    std::path::PathBuf::from("server.cjs")
 }
 
 pub fn start_proxy(config_path: &str) -> Result<ProxyProcess, String> {
@@ -40,6 +44,15 @@ pub fn start_proxy(config_path: &str) -> Result<ProxyProcess, String> {
 
     let mut cmd = Command::new(&node_path);
     cmd.arg(&server_js).env("NODE_ENV", "production");
+
+    // Tell server.cjs where the config directory is (for .env, providers.json, debug_logs)
+    let config_dir = std::path::Path::new(config_path)
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if !config_dir.is_empty() {
+        cmd.env("CONFIG_DIR", &config_dir);
+    }
 
     // Forward .env config to the Node.js process so it uses the configured port
     if let Ok(env_map) = super::config::read_env(config_path) {

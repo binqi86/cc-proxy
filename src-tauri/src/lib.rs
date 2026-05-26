@@ -87,8 +87,9 @@ fn config_dir() -> String {
         let config_path = std::path::PathBuf::from(&home).join(".cc-proxy");
         if !config_path.exists() {
             let _ = std::fs::create_dir_all(&config_path);
-            copy_bundled_resources_to(&config_path);
         }
+        // Always sync bundled resources (server.cjs gets overwritten, providers.json only if missing)
+        copy_bundled_resources_to(&config_path);
         if config_path.join("providers.json").exists() {
             return config_path.to_string_lossy().to_string();
         }
@@ -117,16 +118,12 @@ fn copy_bundled_resources_to(dest: &std::path::Path) {
             let res = contents.join("Resources");
             for sub in &["", "resources"] {
                 let src = if sub.is_empty() { res.clone() } else { res.join(sub) };
-                for file in &["providers.json", "server.cjs"] {
+                // Only copy config files, not server.cjs
+                for file in &["providers.json"] {
                     let src_file = src.join(file);
                     let dest_file = dest.join(file);
-                    if src_file.exists() {
-                        // Always overwrite server.cjs to keep it in sync with the build
-                        // Only create providers.json if it doesn't exist (preserve user config)
-                        let is_server = file.ends_with("server.cjs");
-                        if is_server || !dest_file.exists() {
-                            let _ = std::fs::copy(&src_file, &dest_file);
-                        }
+                    if src_file.exists() && !dest_file.exists() {
+                        let _ = std::fs::copy(&src_file, &dest_file);
                     }
                 }
             }

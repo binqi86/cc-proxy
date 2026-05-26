@@ -1,6 +1,6 @@
 {
   "name": "cc-proxy",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "cc-proxy - macOS 菜单栏代理管理工具",
   "type": "module",
   "scripts": {

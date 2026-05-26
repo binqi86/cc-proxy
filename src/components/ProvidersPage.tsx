@@ -26,6 +26,11 @@ const DEFAULT_CODEX_CHAT_PATH = '/v1/chat/completions';
 const DEFAULT_CLAUDE_CHAT_PATH = '/v1/chat/completions';
 const DEFAULT_MODELS_PATH = '/v1/models';
 
+const UPSTREAM_PROTOCOLS = [
+  { id: 'chat-completions', label: 'Chat Completions', desc: '/v1/chat/completions' },
+  { id: 'responses', label: 'Responses API', desc: '/v1/responses（直接透传）' },
+];
+
 function strip1mSuffix(value: string): string {
   return value.replace(/\[1m\]$/, '').trim();
 }
@@ -37,10 +42,6 @@ function has1mSuffix(value: string): boolean {
 function normalizeProvider1mConfig(provider: ProviderConfig): ProviderConfig {
   const codexBaseUrl = (provider.codexBaseUrl ?? '').trim();
   const claudeBaseUrl = (provider.claudeBaseUrl ?? '').trim();
-  const codexChatPath = (provider.codexChatPath ?? DEFAULT_CODEX_CHAT_PATH).trim();
-  const claudeChatPath = (provider.claudeChatPath ?? DEFAULT_CLAUDE_CHAT_PATH).trim();
-  const codexModelsPath = (provider.codexModelsPath ?? DEFAULT_MODELS_PATH).trim();
-  const claudeModelsPath = (provider.claudeModelsPath ?? DEFAULT_MODELS_PATH).trim();
 
   const claudeModelMap = { ...(provider.claudeModelMap || {}) };
   const claudeModel1mMap = { ...(provider.claudeModel1mMap || {}) };
@@ -61,11 +62,7 @@ function normalizeProvider1mConfig(provider: ProviderConfig): ProviderConfig {
   return {
     ...provider,
     codexBaseUrl,
-    codexChatPath,
-    codexModelsPath,
     claudeBaseUrl,
-    claudeChatPath,
-    claudeModelsPath,
     defaultModel: normalizedDefaultModel,
     claudeModelMap: changed ? claudeModelMap : provider.claudeModelMap,
     claudeModel1mMap: Object.keys(claudeModel1mMap).length > 0 ? claudeModel1mMap : provider.claudeModel1mMap,
@@ -86,13 +83,13 @@ function isClaudeSlotUsed(cm: Record<string, string> | undefined, slotKey: strin
   return false;
 }
 
-const PRESETS: Record<string, { name: string; codexBaseUrl: string; icon: string; codexChatPath: string; defaultModel: string; modelMap: Record<string,string> }> = {
-  deepseek: { name: 'DeepSeek', codexBaseUrl: 'https://api.deepseek.com', icon: 'D', codexChatPath: '/v1/chat/completions', defaultModel: 'deepseek-chat', modelMap: { 'gpt-5.5': 'deepseek-chat', 'gpt-5.4': 'deepseek-chat', 'gpt-5': 'deepseek-chat', 'gpt-5-codex': 'deepseek-chat', 'gpt-5-mini': 'deepseek-chat', 'gpt-5-nano': 'deepseek-chat', 'o4-mini': 'deepseek-chat', 'gpt-5.1': 'deepseek-chat', 'gpt-5.1-codex': 'deepseek-chat', 'gpt-5.1-codex-max': 'deepseek-chat' } },
-  dashscope: { name: '阿里云百炼', codexBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', icon: '百', codexChatPath: '/v1/chat/completions', defaultModel: 'qwen-plus', modelMap: { 'gpt-5': 'qwen-plus', 'gpt-5-codex': 'qwen-max', 'gpt-5-mini': 'qwen-turbo', 'o4-mini': 'qwen-plus' } },
-  zhipu: { name: '智谱 GLM', codexBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', icon: '智', codexChatPath: '/v1/chat/completions', defaultModel: 'glm-4-plus', modelMap: { 'gpt-5': 'glm-4-plus', 'gpt-5-codex': 'glm-4-plus', 'gpt-5-mini': 'glm-4-flash', 'o4-mini': 'glm-4-flash' } },
-  moonshot: { name: 'Moonshot', codexBaseUrl: 'https://api.moonshot.cn/v1', icon: 'M', codexChatPath: '/v1/chat/completions', defaultModel: 'moonshot-v1-8k', modelMap: { 'gpt-5': 'moonshot-v1-8k', 'gpt-5-codex': 'moonshot-v1-32k', 'gpt-5-mini': 'moonshot-v1-8k' } },
-  minimax: { name: 'MiniMax', codexBaseUrl: 'https://api.minimax.chat/v1', icon: '迷', codexChatPath: '/v1/chat/completions', defaultModel: 'abab6.5s-chat', modelMap: { 'gpt-5': 'abab6.5s-chat', 'gpt-5-codex': 'abab6.5s-chat', 'gpt-5-mini': 'abab6.5s-chat' } },
-  'volcengine-coding': { name: '火山 Coding Plan', codexBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', icon: '火', codexChatPath: '/v1/chat/completions', defaultModel: 'doubao-seed-1-6-251015', modelMap: { 'gpt-5': 'doubao-seed-1-6-251015', 'gpt-5-codex': 'doubao-seed-1-6-251015', 'gpt-5.1': 'doubao-seed-1-6-251015', 'gpt-5.1-codex': 'doubao-seed-1-6-251015', 'gpt-5.1-codex-max': 'doubao-seed-1-6-251015' } },
+const PRESETS: Record<string, { name: string; codexBaseUrl: string; icon: string; codexUpstreamProtocol?: string; claudeBaseUrl?: string; defaultModel: string; modelMap: Record<string,string> }> = {
+  deepseek: { name: 'DeepSeek', codexBaseUrl: 'https://api.deepseek.com', icon: 'D', claudeBaseUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-chat', modelMap: { 'gpt-5.5': 'deepseek-chat', 'gpt-5.4': 'deepseek-chat', 'gpt-5': 'deepseek-chat', 'gpt-5-codex': 'deepseek-chat', 'gpt-5-mini': 'deepseek-chat', 'gpt-5-nano': 'deepseek-chat', 'o4-mini': 'deepseek-chat', 'gpt-5.1': 'deepseek-chat', 'gpt-5.1-codex': 'deepseek-chat', 'gpt-5.1-codex-max': 'deepseek-chat' } },
+  dashscope: { name: '阿里云百炼', codexBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode', icon: '百', defaultModel: 'qwen-plus', modelMap: { 'gpt-5': 'qwen-plus', 'gpt-5-codex': 'qwen-max', 'gpt-5-mini': 'qwen-turbo', 'o4-mini': 'qwen-plus' } },
+  zhipu: { name: '智谱 GLM', codexBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', icon: '智', defaultModel: 'glm-4-plus', modelMap: { 'gpt-5': 'glm-4-plus', 'gpt-5-codex': 'glm-4-plus', 'gpt-5-mini': 'glm-4-flash', 'o4-mini': 'glm-4-flash' } },
+  moonshot: { name: 'Moonshot', codexBaseUrl: 'https://api.moonshot.cn/v1', icon: 'M', defaultModel: 'moonshot-v1-8k', modelMap: { 'gpt-5': 'moonshot-v1-8k', 'gpt-5-codex': 'moonshot-v1-32k', 'gpt-5-mini': 'moonshot-v1-8k' } },
+  minimax: { name: 'MiniMax', codexBaseUrl: 'https://api.minimax.chat/v1', icon: '迷', defaultModel: 'abab6.5s-chat', modelMap: { 'gpt-5': 'abab6.5s-chat', 'gpt-5-codex': 'abab6.5s-chat', 'gpt-5-mini': 'abab6.5s-chat' } },
+  'volcengine-coding': { name: '火山 Coding Plan', codexBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', icon: '火', defaultModel: 'doubao-seed-1-6-251015', modelMap: { 'gpt-5': 'doubao-seed-1-6-251015', 'gpt-5-codex': 'doubao-seed-1-6-251015', 'gpt-5.1': 'doubao-seed-1-6-251015', 'gpt-5.1-codex': 'doubao-seed-1-6-251015', 'gpt-5.1-codex-max': 'doubao-seed-1-6-251015' } },
 };
 
 /* Icons */
@@ -151,11 +148,8 @@ export default function ProvidersPage() {
       name: p.name,
       apiKey: '',
       codexBaseUrl: p.codexBaseUrl,
-      codexChatPath: p.codexChatPath,
-      codexModelsPath: DEFAULT_MODELS_PATH,
-      claudeBaseUrl: p.codexBaseUrl,
-      claudeChatPath: p.codexChatPath,
-      claudeModelsPath: DEFAULT_MODELS_PATH,
+      codexUpstreamProtocol: p.codexUpstreamProtocol || 'chat-completions',
+      claudeBaseUrl: p.claudeBaseUrl || p.codexBaseUrl,
       defaultModel: p.defaultModel,
       modelMap: p.modelMap,
     }));
@@ -168,11 +162,8 @@ export default function ProvidersPage() {
       name: '自定义',
       apiKey: '',
       codexBaseUrl: '',
-      codexChatPath: DEFAULT_CODEX_CHAT_PATH,
-      codexModelsPath: DEFAULT_MODELS_PATH,
+      codexUpstreamProtocol: 'chat-completions',
       claudeBaseUrl: '',
-      claudeChatPath: DEFAULT_CLAUDE_CHAT_PATH,
-      claudeModelsPath: DEFAULT_MODELS_PATH,
       defaultModel: 'gpt-4',
       modelMap: {},
     }));
@@ -348,14 +339,15 @@ export default function ProvidersPage() {
           <Field label="Base URL">
             <Input value={editing?.codexBaseUrl || ''} onChange={e => setEditing(editing ? { ...editing, codexBaseUrl: e.target.value } : null)} placeholder="https://api.example.com" />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Chat 路径">
-              <Input value={editing?.codexChatPath || ''} onChange={e => setEditing(editing ? { ...editing, codexChatPath: e.target.value } : null)} />
-            </Field>
-            <Field label="Models 路径">
-              <Input value={editing?.codexModelsPath || ''} onChange={e => setEditing(editing ? { ...editing, codexModelsPath: e.target.value } : null)} />
-            </Field>
-          </div>
+          <Field label="上游协议">
+            <select value={editing?.codexUpstreamProtocol || 'chat-completions'} onChange={e => {
+              setEditing(editing ? { ...editing, codexUpstreamProtocol: e.target.value } : null);
+            }} className="w-full h-8 rounded-lg border border-border bg-card px-2 text-xs">
+              {UPSTREAM_PROTOCOLS.map(p => (
+                <option key={p.id} value={p.id}>{p.label}（{p.desc}）</option>
+              ))}
+            </select>
+          </Field>
           <Field label={`${'Codex'} API Key（可选，留空则用公共 Key）`}>
             <Input value={editing?.codexApiKey || ''} type={showKey ? 'text' : 'password'}
               onChange={e => setEditing(editing ? { ...editing, codexApiKey: e.target.value } : null)}
@@ -456,21 +448,6 @@ export default function ProvidersPage() {
             </div>
           </Field>
 
-          <Field label="推理力度映射 (JSON)">
-            <Input className="h-8 text-xs font-mono" value={editing?.reasoningMapping ? JSON.stringify(editing.reasoningMapping) : ''} onChange={e => {
-              if (!editing) return;
-              try { const v = e.target.value.trim(); setEditing({ ...editing, reasoningMapping: v ? JSON.parse(v) : undefined }); } catch { /* */ }
-            }} placeholder='{"xhigh":"xhigh","high":"high"}' />
-          </Field>
-          <Field label="规范化 Chat Role">
-            <select value={editing?.normalizeChatRoles != null ? (editing.normalizeChatRoles ? '1' : '0') : ''} onChange={e => {
-              const v = e.target.value;
-              setEditing(editing ? { ...editing, normalizeChatRoles: v === '' ? undefined : v === '1' } : null);
-            }} className="w-full h-8 rounded-lg border border-border bg-card px-2 text-xs">
-              <option value="">默认 (开启)</option><option value="1">开启</option><option value="0">关闭</option>
-            </select>
-          </Field>
-
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => switchActiveProvider(editing?.id || '', 'codex')} disabled={editing?.id === codexProviderId}>
               <CodexIcon size={14} dimmed={editing?.id === codexProviderId} /> 设为 Codex 供应商
@@ -489,14 +466,6 @@ export default function ProvidersPage() {
           <Field label="Base URL">
             <Input value={editing?.claudeBaseUrl || ''} onChange={e => setEditing(editing ? { ...editing, claudeBaseUrl: e.target.value } : null)} placeholder="https://api.example.com" />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Chat 路径">
-              <Input value={editing?.claudeChatPath || ''} onChange={e => setEditing(editing ? { ...editing, claudeChatPath: e.target.value } : null)} />
-            </Field>
-            <Field label="Models 路径">
-              <Input value={editing?.claudeModelsPath || ''} onChange={e => setEditing(editing ? { ...editing, claudeModelsPath: e.target.value } : null)} />
-            </Field>
-          </div>
           <Field label={`${'Claude'} API Key（可选，留空则用公共 Key）`}>
             <Input value={editing?.claudeApiKey || ''} type={showKey ? 'text' : 'password'}
               onChange={e => setEditing(editing ? { ...editing, claudeApiKey: e.target.value } : null)}

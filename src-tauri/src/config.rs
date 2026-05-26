@@ -66,16 +66,10 @@ pub fn write_env(path: &str, env: &std::collections::HashMap<String, String>) ->
         "CLAUDE_TARGET_API_KEY",
         "PROVIDER_PRESET",
         "TARGET_API_KEY",
-        "TARGET_BASE_URL",
-        "TARGET_CHAT_PATH",
-        "TARGET_MODELS_PATH",
         "DEFAULT_MODEL",
         "REQUEST_TIMEOUT_MS",
-        "MODEL_MAP",
-        "CLAUDE_MODEL_MAP",
-        "REASONING_MAPPING",
-        "NORMALIZE_CHAT_ROLES",
         "MAX_REQUEST_BODY_SIZE",
+        "DEBUG_REASONING",
     ];
 
     for key in ordered_keys {

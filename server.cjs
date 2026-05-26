@@ -7,7 +7,8 @@ const { URL } = require("node:url");
 
 loadDotEnv(path.join(__dirname, ".env"));
 
-const DEBUG_DIR = process.env.DEBUG_DIR || path.join(__dirname, "debug_logs");
+const CONFIG_DIR = process.env.CONFIG_DIR || __dirname;
+const DEBUG_DIR = process.env.DEBUG_DIR || path.join(CONFIG_DIR, "debug_logs");
 
 function debugLog(label, payload) {
   if (process.env.DEBUG_REASONING !== "1") return;
@@ -19,7 +20,7 @@ function debugLog(label, payload) {
   } catch (e) { /* never break the proxy */ }
 }
 
-const PROVIDER_CONFIG_PATH = process.env.PROVIDER_CONFIG_PATH || path.join(__dirname, "providers.json");
+const PROVIDER_CONFIG_PATH = process.env.PROVIDER_CONFIG_PATH || path.join(CONFIG_DIR, "providers.json");
 const PORT = Number(process.env.PORT || 8088);
 const HOST = process.env.HOST || "127.0.0.1";
 const PROXY_API_KEY = process.env.PROXY_API_KEY || "";
@@ -44,33 +45,32 @@ function loadProviderConfig(mode) {
     || process.env.CODEX_TARGET_API_KEY
     || process.env.TARGET_API_KEY
     || "";
+
+  // Upstream protocol: 'chat-completions' (default) or 'responses' for Codex
+  // Claude always uses 'anthropic' (native passthrough)
+  const upstreamProtocol = mode === "CLAUDE"
+    ? "anthropic"
+    : (preset.codexUpstreamProtocol || "chat-completions");
+
+  // Derive paths from protocol
+  const chatPath = upstreamProtocol === "anthropic" ? "/v1/messages"
+    : upstreamProtocol === "responses" ? "/v1/responses"
+    : "/v1/chat/completions";
+  const modelsPath = "/v1/models";
+
   const modeBaseUrl = mode === "CLAUDE" ? preset.claudeBaseUrl : preset.codexBaseUrl;
-  const modeChatPath = mode === "CLAUDE" ? preset.claudeChatPath : preset.codexChatPath;
-  const modeModelsPath = mode === "CLAUDE" ? preset.claudeModelsPath : preset.codexModelsPath;
-  // Backward compat: fall back to old generic fields if mode-specific ones are empty
-  const fallbackBaseUrl = modeBaseUrl || preset.baseUrl || "";
-  const fallbackChatPath = modeChatPath || preset.chatPath || "/v1/chat/completions";
-  const fallbackModelsPath = modeModelsPath || preset.modelsPath || "/v1/models";
   const baseUrl = stripTrailingSlash(
     process.env[`${mode}_TARGET_BASE_URL`]
-      || fallbackBaseUrl
+      || modeBaseUrl
+      || preset.baseUrl
       || ""
   );
-  const chatPath = process.env[`${mode}_TARGET_CHAT_PATH`]
-    || fallbackChatPath
-    || "/v1/chat/completions";
-  const modelsPath = process.env[`${mode}_TARGET_MODELS_PATH`]
-    || fallbackModelsPath
-    || "/v1/models";
+
   const defaultModel = sanitizeModelName(preset.defaultModel || process.env.DEFAULT_MODEL || "");
   const reasoningMapping = {
-    ...{ xhigh: "xhigh", high: "high", medium: "medium", low: "low", minimal: "low", none: "none", auto: "auto" },
+    xhigh: "xhigh", high: "high", medium: "medium", low: "low", minimal: "low", none: "none", auto: "auto",
     ...parseJsonEnv("REASONING_MAPPING", {}),
-    ...asObject(preset.reasoningMapping),
   };
-  const normalizeChatRoles = preset.normalizeChatRoles != null
-    ? preset.normalizeChatRoles
-    : parseBooleanEnv("NORMALIZE_CHAT_ROLES", true);
   const modelMap = resolveModelMap(
     { ...parseJsonEnv("MODEL_MAP", {}), ...asObject(preset.modelMap) },
     defaultModel
@@ -83,15 +83,16 @@ function loadProviderConfig(mode) {
   return {
     mode,
     presetId: rawPreset,
+    upstreamProtocol,
     apiKey: rawApiKey || preset.apiKey || "",
     chatUrl: joinTargetUrl(baseUrl, chatPath),
-    anthropicMessagesUrl: buildAnthropicMessagesUrl(baseUrl, chatPath),
+    anthropicMessagesUrl: joinTargetUrl(baseUrl, "/v1/messages"),
     modelsUrl: joinTargetUrl(baseUrl, modelsPath),
     defaultModel,
     modelMap,
     claudeModelMap,
     reasoningMapping,
-    normalizeChatRoles,
+    normalizeChatRoles: true,
   };
 }
 
@@ -202,14 +203,42 @@ async function handleChatPassthrough(req, res, provider) {
 }
 
 async function handleResponses(req, res, provider) {
+  // If upstream natively supports Responses API, passthrough directly
+  if (provider.upstreamProtocol === "responses") {
+    return proxyResponsesPassthrough(req, res, provider);
+  }
+
   const responsesRequest = await readJson(req);
   debugLog("rq_input", responsesRequest);
 
   // Warp/Codex stateless mode: pre-extract encrypted_content from reasoning items
   if (Array.isArray(responsesRequest.input)) {
     for (const item of responsesRequest.input) {
-      if (item && item.type === "reasoning" && typeof item.encrypted_content === "string" && item.encrypted_content) {
-        item.reasoning_content = item.reasoning_content || item.encrypted_content;
+      if (item && item.type === "reasoning") {
+        // Ensure reasoning_content is populated from all possible sources
+        if (!item.reasoning_content || typeof item.reasoning_content !== "string") {
+          if (typeof item.encrypted_content === "string" && item.encrypted_content) {
+            item.reasoning_content = item.encrypted_content;
+          } else if (Array.isArray(item.content)) {
+            const text = item.content
+              .map(part => {
+                if (!part || typeof part !== "object") return "";
+                return typeof part.text === "string" ? part.text : "";
+              })
+              .filter(Boolean)
+              .join("\n");
+            if (text) item.reasoning_content = text;
+          } else if (Array.isArray(item.summary)) {
+            const text = item.summary
+              .map(part => {
+                if (!part || typeof part !== "object") return "";
+                return typeof part.text === "string" ? part.text : "";
+              })
+              .filter(Boolean)
+              .join("\n");
+            if (text) item.reasoning_content = text;
+          }
+        }
       }
     }
   }
@@ -225,10 +254,66 @@ async function handleResponses(req, res, provider) {
 
   const upstream = await fetchChatCompletion(chatRequest, provider);
   const upstreamBody = await readUpstreamJson(upstream);
-  if (!upstream.ok) return sendJson(res, upstream.status, upstreamBody);
+  if (!upstream.ok) {
+    debugLog("rq_error", { status: upstream.status, body: upstreamBody, chatRequest_messages: chatRequest.messages });
+    return sendJson(res, upstream.status, upstreamBody);
+  }
 
   const responseBody = convertChatResponseToResponses(upstreamBody, responsesRequest, chatRequest.model);
   return sendJson(res, 200, responseBody);
+}
+
+// Responses API passthrough: forward request directly to upstream that supports /v1/responses
+async function proxyResponsesPassthrough(req, res, provider) {
+  if (!provider.apiKey) {
+    const error = new Error("TARGET_API_KEY is required");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const body = await readJson(req);
+  // Model mapping still applies
+  body.model = mapModel(body.model, provider);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const startTime = Date.now();
+
+  try {
+    logInfo(`[${provider.mode}] 请求: POST /v1/responses (passthrough)`);
+    logInfo(`[${provider.mode}] 转发请求 → ${body.model}${body.stream ? ' stream' : ''}`);
+
+    const upstream = await fetch(provider.chatUrl, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${provider.apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    logUpstreamResponse(upstream.status, Date.now() - startTime, null, provider);
+
+    if (!upstream.ok || !upstream.body) {
+      const errorBody = await readUpstreamJson(upstream);
+      return sendJson(res, upstream.status, errorBody);
+    }
+
+    // Stream or non-stream: pipe through directly
+    copyStatusAndHeaders(upstream, res, ["content-type"]);
+    res.statusCode = upstream.status;
+    if (upstream.body) {
+      await pipeWebStream(upstream.body, res);
+    } else {
+      res.end();
+    }
+  } catch (error) {
+    logUpstreamResponse(0, Date.now() - startTime, error, provider);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function proxyChatCompletion(body, res, provider) {
@@ -253,7 +338,7 @@ async function proxyResponsesStream(originalRequest, chatRequest, res, provider)
   const upstream = await fetchChatCompletion(chatRequest, provider);
   if (!upstream.ok || !upstream.body) {
     const body = await readUpstreamJson(upstream);
-    debugLog("rq_error", { status: upstream.status, body });
+    debugLog("rq_error", { status: upstream.status, body, chatRequest_messages: chatRequest.messages });
     return sendJson(res, upstream.status, body);
   }
 
@@ -658,11 +743,11 @@ function responsesToChatRequest(request, provider) {
           ? `${target.reasoning_content}\n${reasoning}`
           : reasoning;
       };
-      const takePendingReasoning = () => pendingReasoningContent.trim();
+      const getPendingReasoning = () => pendingReasoningContent.trim();
       const flushToolCalls = () => {
         if (pendingToolCalls.length === 0) return;
         const msg = { role: "assistant", tool_calls: pendingToolCalls.splice(0) };
-        const reasoning = takePendingReasoning();
+        const reasoning = getPendingReasoning();
         if (reasoning) {
           appendReasoning(msg, reasoning);
         }
@@ -680,7 +765,7 @@ function responsesToChatRequest(request, provider) {
             const msg = { role, content };
             const explicitReasoning = extractExplicitReasoningText(item);
             const reasoning = role === "assistant"
-              ? (explicitReasoning || takePendingReasoning())
+              ? (explicitReasoning || getPendingReasoning())
               : "";
             if (role === "assistant" && reasoning) {
               appendReasoning(msg, reasoning);
@@ -695,7 +780,14 @@ function responsesToChatRequest(request, provider) {
           case "reasoning": {
             const reasoning = extractReasoningText(item);
             if (reasoning) {
-              pendingReasoningContent = reasoning;
+              // If reasoning follows an assistant message (same turn), attach to it
+              if (lastAssistantMessage && pendingToolCalls.length === 0) {
+                appendReasoning(lastAssistantMessage, reasoning);
+              } else {
+                pendingReasoningContent = pendingReasoningContent
+                  ? `${pendingReasoningContent}\n${reasoning}`
+                  : reasoning;
+              }
             }
             break;
           }
@@ -743,6 +835,18 @@ function responsesToChatRequest(request, provider) {
   // CCX: reasoning.effort → reasoning_effort
   if (request.reasoning && request.reasoning.effort) {
     chat.reasoning_effort = provider.reasoningMapping[request.reasoning.effort] || "auto";
+  }
+
+  // If input contains reasoning items, ensure reasoning_effort is set so that
+  // patchAssistantReasoningForThinking will trigger (DeepSeek requires reasoning_content
+  // on all assistant messages when thinking mode is active)
+  if (!chat.reasoning_effort && Array.isArray(request.input)) {
+    const hasReasoningItems = request.input.some(
+      (item) => item && item.type === "reasoning"
+    );
+    if (hasReasoningItems) {
+      chat.reasoning_effort = chat.reasoning_effort || "high";
+    }
   }
 
   return chat;
@@ -1189,31 +1293,6 @@ function joinTargetUrl(baseUrl, targetPath) {
   return `${stripTrailingSlash(baseUrl)}/${targetPath.replace(/^\/+/, "")}`;
 }
 
-function buildAnthropicMessagesUrl(baseUrl, chatPath) {
-  if (/^https?:\/\//i.test(chatPath)) {
-    if (/\/v1\/messages$/i.test(chatPath)) return chatPath;
-    if (/\/v1\/chat\/completions$/i.test(chatPath)) return chatPath.replace(/\/v1\/chat\/completions$/i, "/v1/messages");
-    if (/\/chat\/completions$/i.test(chatPath)) return chatPath.replace(/\/chat\/completions$/i, "/v1/messages");
-  }
-
-  const normalizedPath = String(chatPath || "").replace(/^\/+/, "/");
-  if (/\/v1\/messages$/i.test(normalizedPath)) {
-    return joinTargetUrl(baseUrl, normalizedPath);
-  }
-  if (/\/v1\/chat\/completions$/i.test(normalizedPath)) {
-    return joinTargetUrl(baseUrl, normalizedPath.replace(/\/v1\/chat\/completions$/i, "/v1/messages"));
-  }
-  if (/\/chat\/completions$/i.test(normalizedPath)) {
-    return joinTargetUrl(baseUrl, normalizedPath.replace(/\/chat\/completions$/i, "/v1/messages"));
-  }
-  return joinTargetUrl(baseUrl, "/v1/messages");
-}
-
-function isAnthropicNativeProvider(provider) {
-  const chatUrl = String(provider && provider.chatUrl || "").toLowerCase();
-  return /\/v1\/messages$/.test(chatUrl) || /\/messages$/.test(chatUrl);
-}
-
 function stripTrailingSlash(value) {
   return value.replace(/\/+$/, "");
 }
@@ -1245,15 +1324,6 @@ function loadDotEnv(filePath) {
 //  Claude / Anthropic Messages API support
 // ============================================================
 
-function resolveClaudeModelMap(claudeMap, defaultModel) {
-  if (Object.keys(claudeMap).length > 0) return claudeMap;
-  const fallback = {};
-  for (const [key, value] of Object.entries(MODEL_MAP)) {
-    fallback[key] = value;
-  }
-  return fallback;
-}
-
 function mapClaudeModel(model, provider) {
   const requested = sanitizeModelName(model || provider.defaultModel);
   return provider.claudeModelMap[requested] || provider.defaultModel || requested;
@@ -1268,286 +1338,6 @@ function sanitizeModelName(value) {
   return normalized;
 }
 
-// ---- content helpers ----
-
-function anthropicContentToText(content) {
-  if (content == null) return "";
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return JSON.stringify(content);
-  return content
-    .map((block) => {
-      if (typeof block === "string") return block;
-      if (block && typeof block === "object" && typeof block.text === "string") return block.text;
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
-}
-
-function toolResultContent(block) {
-  const content = block.content;
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    const text = anthropicContentToText(content);
-    return text || JSON.stringify(content);
-  }
-  if (content == null) return "";
-  if (typeof content === "object") return JSON.stringify(content);
-  return String(content);
-}
-
-// ---- Anthropic -> OpenAI Chat conversion ----
-
-function anthropicToolsToOpenai(tools) {
-  if (!Array.isArray(tools)) return [];
-  return tools
-    .map((tool) => {
-      if (!tool || typeof tool !== "object") return null;
-      if (tool.type === "function" && tool.function) return tool;
-      const name = tool.name;
-      if (!name) return null;
-      return {
-        type: "function",
-        function: {
-          name: name,
-          description: tool.description || "",
-          parameters: tool.input_schema || tool.parameters || { type: "object" },
-        },
-      };
-    })
-    .filter(Boolean);
-}
-
-function anthropicToolChoiceToOpenai(toolChoice) {
-  if (!toolChoice || typeof toolChoice !== "object") return toolChoice;
-  const ct = toolChoice.type;
-  if (ct === "auto") return "auto";
-  if (ct === "any") return "required";
-  if (ct === "none") return "none";
-  if (ct === "tool" && toolChoice.name) {
-    return { type: "function", function: { name: toolChoice.name } };
-  }
-  return toolChoice;
-}
-
-function anthropicMessageToOpenai(message) {
-  const role = message.role || "user";
-  const content = message.content;
-
-  if (!Array.isArray(content)) {
-    const normalizedRole =
-      role === "assistant" || role === "system" || role === "tool" ? role : "user";
-    return [{ role: normalizedRole, content: anthropicContentToText(content) }];
-  }
-
-  const textBlocks = [];
-  const toolCalls = [];
-  const toolMessages = [];
-
-  for (const block of content) {
-    if (!block || typeof block !== "object") {
-      textBlocks.push(String(block));
-      continue;
-    }
-    const blockType = block.type;
-    if (blockType === "tool_result") {
-      toolMessages.push({
-        role: "tool",
-        tool_call_id: block.tool_use_id || block.id || "",
-        content: toolResultContent(block),
-      });
-    } else if (blockType === "tool_use") {
-      toolCalls.push({
-        id: block.id || makeId("call"),
-        type: "function",
-        function: {
-          name: block.name || "tool",
-          arguments: JSON.stringify(block.input || {}),
-        },
-      });
-    } else if (typeof block.text === "string") {
-      textBlocks.push(block.text);
-    }
-  }
-
-  const messages = [];
-
-  if (role === "assistant" && toolCalls.length > 0) {
-    messages.push({
-      role: "assistant",
-      content: textBlocks.join("\n") || null,
-      tool_calls: toolCalls,
-    });
-  } else if (role === "user" && toolMessages.length > 0) {
-    messages.push(...toolMessages);
-    const text = textBlocks.join("\n");
-    if (text) messages.push({ role: "user", content: text });
-  } else {
-    const validRole = ["system", "user", "assistant", "tool"].includes(role) ? role : "user";
-    messages.push({ role: validRole, content: textBlocks.join("\n") });
-  }
-
-  return messages;
-}
-
-function anthropicToOpenaiChatBody(body, stream) {
-  const messages = (body.messages || []).map((m) => ({ ...m }));
-
-  let systemContent = body.system;
-  if (!systemContent && messages.length > 0 && messages[0].role === "system") {
-    systemContent = messages.shift().content;
-  }
-
-  const openaiMessages = [];
-  const systemText = anthropicContentToText(systemContent);
-  if (systemText) {
-    openaiMessages.push({ role: "system", content: systemText });
-  }
-
-  for (const msg of messages) {
-    openaiMessages.push(...anthropicMessageToOpenai(msg));
-  }
-
-  const openaiBody = {
-    model: body.model || "",
-    messages: openaiMessages,
-    max_tokens: body.max_tokens || 4096,
-    stream: stream,
-  };
-
-  if (body.temperature != null) openaiBody.temperature = body.temperature;
-  if (body.top_p != null) openaiBody.top_p = body.top_p;
-  if (body.stop_sequences && body.stop_sequences.length > 0) {
-    openaiBody.stop = body.stop_sequences;
-  }
-
-  const tools = anthropicToolsToOpenai(body.tools);
-  if (tools.length > 0) {
-    openaiBody.tools = tools;
-    if (body.tool_choice != null) {
-      openaiBody.tool_choice = anthropicToolChoiceToOpenai(body.tool_choice);
-    }
-  }
-
-  return openaiBody;
-}
-
-// ---- OpenAI Chat -> Anthropic conversion ----
-
-function toolCallToAnthropicBlock(toolCall) {
-  const func = toolCall.function || {};
-  let parsedArgs;
-  try {
-    parsedArgs = typeof func.arguments === "string" ? JSON.parse(func.arguments) : func.arguments;
-  } catch {
-    parsedArgs = { arguments: func.arguments };
-  }
-  return {
-    type: "tool_use",
-    id: toolCall.id || makeId("toolu"),
-    name: func.name || "tool",
-    input: parsedArgs && typeof parsedArgs === "object" && !Array.isArray(parsedArgs)
-      ? parsedArgs
-      : { value: parsedArgs },
-  };
-}
-
-function openaiFinishReasonToAnthropic(reason, hasToolCalls) {
-  if (hasToolCalls) return "tool_use";
-  const mapping = {
-    stop: "end_turn",
-    length: "max_tokens",
-    tool_calls: "tool_use",
-    function_call: "tool_use",
-  };
-  return mapping[reason] || "end_turn";
-}
-
-function openaiChatToAnthropic(openaiResp, model) {
-  const choice = (openaiResp.choices || [{}])[0];
-  const message = choice.message || {};
-  const contentBlocks = [];
-
-  if (message.content) {
-    contentBlocks.push({ type: "text", text: message.content });
-  }
-  for (const toolCall of message.tool_calls || []) {
-    if (toolCall && typeof toolCall === "object") {
-      contentBlocks.push(toolCallToAnthropicBlock(toolCall));
-    }
-  }
-  if (contentBlocks.length === 0) {
-    contentBlocks.push({ type: "text", text: "" });
-  }
-
-  const usage = openaiResp.usage || {};
-  return {
-    id: openaiResp.id || makeId("msg"),
-    type: "message",
-    role: "assistant",
-    model: model,
-    content: contentBlocks,
-    stop_reason: openaiFinishReasonToAnthropic(choice.finish_reason, Boolean(message.tool_calls)),
-    stop_sequence: null,
-    usage: {
-      input_tokens: usage.prompt_tokens || usage.input_tokens || 0,
-      output_tokens: usage.completion_tokens || usage.output_tokens || 0,
-    },
-  };
-}
-
-// ---- Anthropic streaming ----
-
-function openaiChatChunkToAnthropicEvent(chunk, model, state) {
-  const choices = chunk.choices || [];
-  if (choices.length === 0) return { type: "message_stop" };
-
-  const delta = choices[0].delta || {};
-  const finishReason = choices[0].finish_reason;
-
-  if (delta.tool_calls) {
-    return {
-      type: "error",
-      error: {
-        type: "unsupported_streaming_tool_call",
-        message: "Streaming tool calls are not supported in protocol conversion mode.",
-      },
-    };
-  }
-
-  const content = delta.content || "";
-  if (!content) {
-    if (finishReason) return { type: "message_stop" };
-    if (delta.role) {
-      return {
-        type: "message_start",
-        message: {
-          id: state.messageId,
-          type: "message",
-          role: "assistant",
-          model: model,
-          content: [],
-          stop_reason: null,
-          stop_sequence: null,
-          usage: { input_tokens: 0, output_tokens: 0 },
-        },
-      };
-    }
-    return { type: "ping" };
-  }
-
-  return {
-    type: "content_block_delta",
-    index: 0,
-    delta: { type: "text_delta", text: content },
-  };
-}
-
-function writeAnthropicSse(res, event) {
-  res.write(`event: ${event.type}\n`);
-  res.write(`data: ${JSON.stringify(event)}\n\n`);
-}
-
 // ---- /v1/messages handler ----
 
 async function handleAnthropicMessages(req, res, provider) {
@@ -1556,32 +1346,21 @@ async function handleAnthropicMessages(req, res, provider) {
 
   console.log(`${ts()} INFO [${normalizeLogSource(provider && provider.mode)}] 请求: POST /v1/messages`);
 
-  body.__originalModel = body.model;
-  body.__endpoint = "/v1/messages";
   body.model = mapClaudeModel(body.model, provider);
 
   if (originalModel && originalModel !== body.model) {
     console.log(`${ts()} INFO [${normalizeLogSource(provider && provider.mode)}] 模型映射: ${originalModel} → ${body.model}`);
   }
-  const useNativeAnthropic = isAnthropicNativeProvider(provider);
-  console.log(`${ts()} INFO [${normalizeLogSource(provider && provider.mode)}] 转发请求 → ${useNativeAnthropic ? provider.anthropicMessagesUrl : provider.chatUrl}`);
-  const chatRequest = anthropicToOpenaiChatBody(body, Boolean(body.stream));
+  console.log(`${ts()} INFO [${normalizeLogSource(provider && provider.mode)}] 转发请求 → ${provider.anthropicMessagesUrl}`);
 
-  if (body.stream && useNativeAnthropic) {
+  // Always passthrough as Anthropic protocol
+  if (body.stream) {
     return proxyAnthropicNativeStreaming(body, req, res, provider);
   }
-  if (body.stream) {
-    return proxyAnthropicStreaming(body, chatRequest, res, provider);
-  }
 
-  const upstream = useNativeAnthropic
-    ? await fetchAnthropicMessages(body, req, provider)
-    : await fetchChatCompletion({ ...chatRequest, stream: false }, provider);
+  const upstream = await fetchAnthropicMessages(body, req, provider);
   const upstreamBody = await readUpstreamJson(upstream);
-  if (!upstream.ok) return sendJson(res, upstream.status, upstreamBody);
-  if (useNativeAnthropic) return sendJson(res, upstream.status, upstreamBody);
-  const anthropicResponse = openaiChatToAnthropic(upstreamBody, chatRequest.model);
-  return sendJson(res, 200, anthropicResponse);
+  return sendJson(res, upstream.status, upstreamBody);
 }
 
 async function fetchAnthropicMessages(body, req, provider) {
@@ -1627,104 +1406,6 @@ async function proxyAnthropicNativeStreaming(body, req, res, provider) {
     "x-accel-buffering": "no",
   });
   await pipeWebStream(upstream.body, res);
-}
-
-async function proxyAnthropicStreaming(originalRequest, chatRequest, res, provider) {
-  const state = {
-    messageId: makeId("msg"),
-    messageStarted: false,
-    contentBlockStarted: false,
-    textBuffer: "",
-    finalUsage: null,
-  };
-
-  const upstream = await fetchChatCompletion(chatRequest, provider);
-  if (!upstream.ok || !upstream.body) {
-    const body = await readUpstreamJson(upstream);
-    debugLog("rq_error", { status: upstream.status, body });
-    return sendJson(res, upstream.status, body);
-  }
-
-  res.writeHead(200, {
-    "content-type": "text/event-stream; charset=utf-8",
-    "cache-control": "no-cache, no-transform",
-    connection: "keep-alive",
-    "x-accel-buffering": "no",
-  });
-
-  try {
-    await consumeChatCompletionStream(upstream.body, (chunk) => {
-      if (!state.messageStarted) {
-        state.messageStarted = true;
-        writeAnthropicSse(res, {
-          type: "message_start",
-          message: {
-            id: state.messageId,
-            type: "message",
-            role: "assistant",
-            model: chatRequest.model,
-            content: [],
-            stop_reason: null,
-            stop_sequence: null,
-            usage: { input_tokens: 0, output_tokens: 0 },
-          },
-        });
-      }
-
-      const event = openaiChatChunkToAnthropicEvent(chunk, chatRequest.model, state);
-
-      if (event.type === "message_start") {
-        if (!state.messageStarted) {
-          state.messageStarted = true;
-          state.messageId = event.message.id;
-          writeAnthropicSse(res, event);
-        }
-        return;
-      }
-
-      if (event.type === "content_block_delta") {
-        if (!state.contentBlockStarted) {
-          state.contentBlockStarted = true;
-          writeAnthropicSse(res, {
-            type: "content_block_start",
-            index: 0,
-            content_block: { type: "text", text: "" },
-          });
-        }
-        state.textBuffer += event.delta.text;
-        writeAnthropicSse(res, event);
-        return;
-      }
-
-      if (event.type === "ping") return;
-
-      if (chunk.usage) {
-        state.finalUsage = chunk.usage;
-      }
-    });
-
-    if (state.contentBlockStarted) {
-      writeAnthropicSse(res, { type: "content_block_stop", index: 0 });
-    }
-
-    const outputTokens = state.finalUsage
-      ? (state.finalUsage.completion_tokens || state.finalUsage.output_tokens || 0)
-      : 0;
-    writeAnthropicSse(res, {
-      type: "message_delta",
-      delta: { stop_reason: "end_turn", stop_sequence: null },
-      usage: { output_tokens: outputTokens },
-    });
-
-    writeAnthropicSse(res, { type: "message_stop" });
-    res.end();
-  } catch (error) {
-    writeAnthropicSse(res, {
-      type: "error",
-      error: { type: "proxy_stream_error", message: error.message },
-    });
-    res.end();
-  }
 }
 
 // ---- Anthropic model list format ----
