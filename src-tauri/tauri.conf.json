@@ -47,7 +47,10 @@
       "providerShortName": null,
       "signingIdentity": null
     },
-    "targets": "app",
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "shortDescription": "cc-proxy - 本地大模型代理管理工具",
     "longDescription": "将 OpenAI / Anthropic 协议转为国内大模型 API 的本地代理工具，macOS 菜单栏一键启停",
     "externalBin": [],
