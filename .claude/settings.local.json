@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(ALL_PROXY=\"socks5h://127.0.0.1:62882\" HTTPS_PROXY=\"\" https_proxy=\"\" HTTP_PROXY=\"\" http_proxy=\"\" git push origin main)"
     ]
   }
 }

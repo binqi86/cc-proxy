@@ -57,7 +57,7 @@
     "resources": [
       "resources/providers.json",
       "../server.cjs",
-      "../server/**"
+      "../server/*.cjs"
     ]
   },
   "plugins": {}
