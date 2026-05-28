@@ -2,27 +2,16 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getStoredTheme, toggleTheme, applyTheme } from '@/lib/theme';
+import { sortProviders } from '@/lib/providers';
 import { getClaudeModels } from '@/store/appStore';
 import { ClaudeIcon, CodexIcon } from '@/components/BrandIcons';
 import ProviderIcon from '@/components/ProviderIcon';
+import { Toggle } from '@/components/shared';
+import { PlayIcon, StopIcon, MoonIcon, SunIcon, OpenIcon, QuitIcon } from '@/lib/icons';
 import type { ProviderConfig, AppStats } from '@/lib/config';
 
-const PROVIDER_ORDER = ['deepseek', 'dashscope', 'zhipu', 'moonshot', 'minimax', 'volcengine-coding'];
 const POPUP_MIN_HEIGHT = 120;
 const POPUP_MAX_HEIGHT = 800;
-
-const PlayIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 3"/></svg>);
-const StopIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>);
-const MoonIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>);
-const SunIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2"/></svg>);
-const OpenIcon = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M9 21V9"/></svg>);
-const QuitIcon = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>);
-
-function sortedProviders(providers: Record<string, ProviderConfig>): [string, ProviderConfig][] {
-  const entries = Object.entries(providers);
-  entries.sort((a, b) => { const ia = PROVIDER_ORDER.indexOf(a[0]), ib = PROVIDER_ORDER.indexOf(b[0]); if (ia === -1 && ib === -1) return a[0].localeCompare(b[0]); if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib; });
-  return entries;
-}
 
 export default function TrayPopup() {
   const [stats, setStats] = useState<AppStats>({ running: false, pid: undefined, port: undefined, request_count: 0 });
@@ -42,7 +31,7 @@ export default function TrayPopup() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDark = theme === 'dark';
-  const providerList = sortedProviders(providers);
+  const providerList = sortProviders(providers);
   const configuredProviders = providerList.filter(([, p]) => p.apiKey && p.apiKey.trim().length > 0);
   const codexProvider = codexId ? providers[codexId] : null;
   const claudeProvider = claudeId ? providers[claudeId] : null;

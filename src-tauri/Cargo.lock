@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "cc-proxy"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "objc",
  "regex",
