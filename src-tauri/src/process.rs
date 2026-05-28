@@ -22,7 +22,7 @@ fn resolve_server_js() -> std::path::PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(contents) = exe.parent().and_then(|p| p.parent()) {
             let res = contents.join("Resources");
-            for sub in &["", "resources"] {
+            for sub in &["", "resources", "_up_"] {
                 let candidate = if sub.is_empty() { res.join("server.cjs") } else { res.join(sub).join("server.cjs") };
                 if candidate.exists() {
                     return candidate;
