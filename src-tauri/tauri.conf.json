@@ -56,7 +56,8 @@
     "externalBin": [],
     "resources": [
       "resources/providers.json",
-      "../server.cjs"
+      "../server.cjs",
+      "../server/**"
     ]
   },
   "plugins": {}
