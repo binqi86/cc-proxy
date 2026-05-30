@@ -4,26 +4,42 @@
       <stop offset="0%" stop-color="#1a1a2e"/>
       <stop offset="100%" stop-color="#16213e"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="codex" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#00d4ff"/>
       <stop offset="100%" stop-color="#0099cc"/>
+    </linearGradient>
+    <linearGradient id="claude" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F0A16C"/>
+      <stop offset="100%" stop-color="#D97757"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="50%" stop-color="#8888aa"/>
+      <stop offset="100%" stop-color="#D97757"/>
     </linearGradient>
   </defs>
   <!-- Background rounded rect -->
   <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bg)"/>
-  <!-- Outer ring -->
-  <circle cx="256" cy="240" r="160" fill="none" stroke="url(#accent)" stroke-width="6" opacity="0.3"/>
-  <!-- Left arrow (incoming) -->
-  <path d="M120 200 L180 240 L120 280" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Right arrow (outgoing) -->
-  <path d="M392 200 L332 240 L392 280" fill="none" stroke="#00d4ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Center diamond/proxy -->
-  <rect x="216" y="200" width="80" height="80" rx="16" fill="none" stroke="url(#accent)" stroke-width="6" transform="rotate(45 256 240)"/>
-  <!-- Small dots at corners of diamond -->
-  <circle cx="256" cy="184" r="6" fill="#00d4ff"/>
-  <circle cx="256" cy="296" r="6" fill="#00d4ff"/>
-  <circle cx="200" cy="240" r="6" fill="#00d4ff"/>
-  <circle cx="312" cy="240" r="6" fill="#00d4ff"/>
-  <!-- App name text -->
-  <text x="256" y="425" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#e0e0e0" letter-spacing="2">CODEX</text>
+  <!-- Outer ring: split cyan (Codex) to orange (Claude) -->
+  <circle cx="256" cy="230" r="145" fill="none" stroke="url(#ring)" stroke-width="4" opacity="0.5"/>
+  <!-- Left arrow (Codex / incoming) -->
+  <path d="M140 195 L185 225 L140 255" fill="none" stroke="url(#codex)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right arrow (Claude / outgoing) -->
+  <path d="M372 195 L327 225 L372 255" fill="none" stroke="url(#claude)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Center diamond/proxy: left half cyan, right half orange -->
+  <path d="M256 190 L312 230 L256 270 L200 230 Z" fill="none" stroke="url(#ring)" stroke-width="5" opacity="0.85"/>
+  <!-- Codex dot (top) -->
+  <circle cx="256" cy="176" r="5" fill="#00d4ff"/>
+  <!-- Claude dot (bottom) -->
+  <circle cx="256" cy="284" r="5" fill="#D97757"/>
+  <!-- Codex dot (left) -->
+  <circle cx="188" cy="230" r="5" fill="#00d4ff"/>
+  <!-- Claude dot (right) -->
+  <circle cx="324" cy="230" r="5" fill="#D97757"/>
+  <!-- CODEX text -->
+  <text x="216" y="400" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#00d4ff" letter-spacing="2">CODEX</text>
+  <!-- Divider dot -->
+  <circle cx="260" cy="395" r="4" fill="#8888aa"/>
+  <!-- CLAUDE text -->
+  <text x="300" y="400" text-anchor="start" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#D97757" letter-spacing="2">CLAUDE</text>
 </svg>

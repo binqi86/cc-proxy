@@ -8,7 +8,7 @@ mod localization;
 use std::sync::Mutex;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, RunEvent};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::image::Image;
 
@@ -856,23 +856,35 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Hide main window after setup
+            // Show main window on startup
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.hide();
+                let _ = window.show();
+                let _ = window.set_focus();
             }
 
-            // Hide Dock icon on macOS
+            // Ensure Dock icon is visible on macOS
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            app.set_activation_policy(tauri::ActivationPolicy::Regular);
 
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                // Only intercept close for main window (popup has no close button)
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            if let RunEvent::Reopen { .. } = event {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        });
 }
